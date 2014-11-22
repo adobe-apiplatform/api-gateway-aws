@@ -37,6 +37,7 @@ __DATA__
 --- http_config eval: $::HttpConfig
 --- config
         location /test-signature {
+            # stg:  :
             set $aws_access_key AKIAIBF2BKMFXSCLCR4Q;
             set $aws_secret_key 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;
             set $aws_region us-east-1;
@@ -58,9 +59,9 @@ __DATA__
 
                 local requestbody = "Action=GenerateDataKey"
 
-                local keyId = "I MAY BE A LONG MESSAGE.YOU HAVE BEEN WARNED"
+                local keyId = "arn:aws:kms:us-east-1:889681731264:key/8120770f-33a6-4613-b740-0e39ae15cc3f"
 
-                requestbody = requestbody .. "&KeyId=" .. keyId
+                requestbody = requestbody .. "&KeyId=" .. keyId  .. "&KeySpec=AES_256"
 
                 local authorization = awsAuth:getAuthorizationHeader( ngx.var.request_method,
                                                                     "/",
