@@ -32,24 +32,70 @@ run_tests();
 
 __DATA__
 
-=== TEST 1: test request args with same first character
+
+=== TEST 1: test GenerateDataKey
 --- http_config eval: $::HttpConfig
 --- config
         location /test-signature {
+            set $aws_access_key AKIAIBF2BKMFXSCLCR4Q;
+            set $aws_secret_key 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;
+            set $aws_region us-east-1;
+            set $aws_service kms;
+
+            resolver 10.8.4.247;
 
             content_by_lua '
+
+                local host = ngx.var.aws_service .."." .. ngx.var.aws_region .. ".amazonaws.com"
+
                 local AWSV4S = require "api-gateway.aws.AwsV4Signature"
-                local awsAuth =  AWSV4S:new()
-                ngx.print(awsAuth:formatQueryString(ngx.req.get_uri_args()))
+                local awsAuth =  AWSV4S:new({
+                                   aws_region  = ngx.var.aws_region,
+                                   aws_service = ngx.var.aws_service,
+                                   aws_secret_key = ngx.var.aws_secret_key,
+                                   aws_access_key = ngx.var.aws_access_key
+                              })
+
+                local requestbody = "Action=GenerateDataKey"
+
+                local keyId = "I MAY BE A LONG MESSAGE.YOU HAVE BEEN WARNED"
+
+                requestbody = requestbody .. "&KeyId=" .. keyId
+
+                local authorization = awsAuth:getAuthorizationHeader( ngx.var.request_method,
+                                                                    "/",
+                                                                    {}, -- ngx.req.get_uri_args()
+                                                                    requestbody)
+
+                local http = require "api-gateway.aws.httpclient.http"
+                local hc = http:new()
+
+
+                local ok, code, headers, status, body  = hc:request {
+                        scheme = "https",
+                        port = 443,
+                        url = "/", -- .. "?" .. ngx.var.args,
+                        host = host,
+                        body = requestbody,
+                        method = ngx.var.request_method,
+                        headers = {
+                                    Authorization = authorization,
+                                    ["X-Amz-Date"] = awsAuth.aws_date,
+                                    ["Content-Type"] = "application/x-www-form-urlencoded"
+                                }
+                }
+                ngx.say(ok)
+                ngx.say(code)
+                ngx.say(status)
+                ngx.say(body)
             ';
         }
-
 --- more_headers
 X-Test: test
 --- request
-POST /test-signature?Subject=nginx:test!@$&TopicArn=arn:aws:sns:us-east-1:492299007544:apiplatform-dev-ue1-topic-analytics&Message=hello_from_nginx!&Action=Publish&Subject1=nginx:test
---- response_body eval
-["Action=Publish&Message=hello_from_nginx%21&Subject=nginx%3Atest%21%40%24&Subject1=nginx%3Atest&TopicArn=arn%3Aaws%3Asns%3Aus-east-1%3A492299007544%3Aapiplatform-dev-ue1-topic-analytics"]
+POST /test-signature?Action=GenerateDataKey
+--- response_body_like eval
+[".*PublishResult.*ResponseMetadata.*"]
 --- error_code: 200
 --- no_error_log
 [error]

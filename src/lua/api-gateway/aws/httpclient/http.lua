@@ -263,6 +263,17 @@ function _M.request(self, reqt)
         return nil, "sock connected failed " .. err
     end
 
+    if nreqt.scheme == "https" then
+        local verify = true
+--        if params.ssl_verify == false then
+--            verify = false
+--        end
+        local ok, err = sock:sslhandshake(nreqt.host, verify)
+        if not ok then
+            return nil, err
+        end
+    end
+
     -- check type of req_body, maybe string, file, function
     local req_body = nreqt.body
     local req_body_type = nil
