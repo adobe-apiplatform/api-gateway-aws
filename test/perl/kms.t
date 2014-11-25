@@ -38,8 +38,8 @@ __DATA__
 --- config
         location /test-signature {
             # stg:  :
-            set $aws_access_key AKIAILORHBFMVEP2LLDA;
-            set $aws_secret_key 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;
+            set $aws_access_key AKIAILORHB743FMVEP2LLDA;
+            set $aws_secret_key H6i7wSYrtQPWL/523+L8g5lZmWWugMoAz4JnJJfLLb;
             set $aws_region us-east-1;
             set $aws_service kms;
 
@@ -67,15 +67,17 @@ __DATA__
                     aws_access_key = ngx.var.aws_access_key
                 })
                 local ok, code, headers, status, body  = service:performAction("ListAliases", {}, path, ngx.var.request_method, true, 120000 )
-                ok, code, headers, status, body  = service:performAction("GenerateDataKey", o, path, ngx.var.request_method, true, 120000 )
+                ngx.say(status)
+                ngx.say(body)
 
+                ok, code, headers, status, body  = service:performAction("GenerateDataKey", o, path, ngx.var.request_method, true, 120000 )
                 ngx.say(status)
                 ngx.say(body)
 
                 local cjson = require"cjson"
                 local cipher = cjson.decode(body)
                 local blob = cipher["GenerateDataKeyResponse"]["GenerateDataKeyResult"]["CiphertextBlob"]
-                local blob = "CiBqGtLctbehq6wBcoXkGroAGoExTJTHN75gf8bc15CNcBKnAQEBAwB4ahrS3LW3oausAXKF5Bq6ABqBMUyUxze+YH/G3NeQjXAAAAB+MHwGCSqGSIb3DQEHBqBvMG0CAQAwaAYJKoZIhvcNAQcBMB4GCWCGSAFlAwQBLjARBAxCWQz4VAlKxYYtnQACARCAO/519dhWwSzweyXMjRWz/gElI2DM8lJu6WVPhF3tB/MwEfGB87stexHaHhxqQsx8uhtmp8PqXZ+Iu6LX"
+                --local blob = "CiBqGtLctbehq6wBcoXkGroAGoExTJTHN75gf8bc15CNcBKnAQEBAwB4ahrS3LW3oausAXKF5Bq6ABqBMUyUxze+YH/G3NeQjXAAAAB+MHwGCSqGSIb3DQEHBqBvMG0CAQAwaAYJKoZIhvcNAQcBMB4GCWCGSAFlAwQBLjARBAxCWQz4VAlKxYYtnQACARCAO/519dhWwSzweyXMjRWz/gElI2DM8lJu6WVPhF3tB/MwEfGB87stexHaHhxqQsx8uhtmp8PqXZ+Iu6LX"
                 ngx.say("BLOB:" .. blob)
                 ok, code, headers, status, body  = service:performAction("Decrypt", {CiphertextBlob=blob}, path, "POST", true, 120000 )
 
