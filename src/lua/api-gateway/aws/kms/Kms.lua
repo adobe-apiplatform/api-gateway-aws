@@ -4,7 +4,10 @@
 -- Date: 21/11/14
 -- Time: 16:16
 -- To change this template use File | Settings | File Templates.
---
+
+
+---  AwsHttpRequest (HttpAWSApi , Signature ) <- AWSResource <- KMS
+---
 
 local _M = { _VERSION = '0.01' }
 
@@ -38,10 +41,28 @@ end
 --        "KeyId": "string",
 --        "Plaintext": blob
 --    }
-function _M:GenerateDataKey(keyId, keySpec, numberOfBytes, encryptionContext)
-    if ( keySpec ~= "AES_256" and keySpec ~= "AES_128" ) then
-        error("Invalid keySpec got:" .. tostring(keySpec))
-    end
+function _M:generateDataKey(keyId, keySpec, numberOfBytes, encryptionContext)
+
+end
+
+-- API: http://docs.aws.amazon.com/kms/latest/APIReference/API_Decrypt.html
+-- Request
+--    {
+--        "CiphertextBlob": blob,
+--        "EncryptionContext":
+--            {
+--                "string" :
+--                    "string"
+--            },
+--        "GrantTokens": [
+--            "string"
+--        ]
+--    }
+function _M:decrypt(cipherText, encryptionContext, grantTokens)
+
+end
+
+function _M:encrypt(keyId, plaintext, encryptionContext, grantTokens)
 
 end
 

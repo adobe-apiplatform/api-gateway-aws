@@ -33,60 +33,52 @@ run_tests();
 __DATA__
 
 
-=== TEST 1: test GenerateDataKey
+=== TEST 1: test GenerateDataKey with Generic AwsService
 --- http_config eval: $::HttpConfig
 --- config
         location /test-signature {
             # stg:  :
-            set $aws_access_key AKIAIBF2BKMFXSCLCR4Q;
-            set $aws_secret_key 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;
+            set $aws_access_key AKIAILORHBFMVEP2LLDA;
+            set $aws_secret_key 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;
             set $aws_region us-east-1;
             set $aws_service kms;
 
+            #resolver 8.8.8.8;
             resolver 10.8.4.247;
 
             content_by_lua '
 
                 local host = ngx.var.aws_service .."." .. ngx.var.aws_region .. ".amazonaws.com"
 
-                local AWSV4S = require "api-gateway.aws.AwsV4Signature"
-                local awsAuth =  AWSV4S:new({
-                                   aws_region  = ngx.var.aws_region,
-                                   aws_service = ngx.var.aws_service,
-                                   aws_secret_key = ngx.var.aws_secret_key,
-                                   aws_access_key = ngx.var.aws_access_key
-                              })
-
-                local requestbody = "Action=GenerateDataKey"
-
-                local keyId = "arn:aws:kms:us-east-1:889681731264:key/8120770f-33a6-4613-b740-0e39ae15cc3f"
-
-                requestbody = requestbody .. "&KeyId=" .. keyId  .. "&KeySpec=AES_256"
-
-                local authorization = awsAuth:getAuthorizationHeader( ngx.var.request_method,
-                                                                    "/",
-                                                                    {}, -- ngx.req.get_uri_args()
-                                                                    requestbody)
-
-                local http = require "api-gateway.aws.httpclient.http"
-                local hc = http:new()
-
-
-                local ok, code, headers, status, body  = hc:request {
-                        scheme = "https",
-                        port = 443,
-                        url = "/", -- .. "?" .. ngx.var.args,
-                        host = host,
-                        body = requestbody,
-                        method = ngx.var.request_method,
-                        headers = {
-                                    Authorization = authorization,
-                                    ["X-Amz-Date"] = awsAuth.aws_date,
-                                    ["Content-Type"] = "application/x-www-form-urlencoded"
-                                }
+                local o = {
+                    KeyId   =  "alias/GW-CACHE-MK",
+                    KeySpec = "AES_256",
+                    --NumberOfBytes = 128
                 }
-                ngx.say(ok)
-                ngx.say(code)
+
+                local path = "/"
+
+                local AwsService = require "api-gateway.aws.AwsService"
+
+                local service = AwsService:new({
+                    aws_service = ngx.var.aws_service,
+                    aws_region = ngx.var.aws_region,
+                    aws_secret_key = ngx.var.aws_secret_key,
+                    aws_access_key = ngx.var.aws_access_key
+                })
+                local ok, code, headers, status, body  = service:performAction("ListAliases", {}, path, ngx.var.request_method, true, 120000 )
+                ok, code, headers, status, body  = service:performAction("GenerateDataKey", o, path, ngx.var.request_method, true, 120000 )
+
+                ngx.say(status)
+                ngx.say(body)
+
+                local cjson = require"cjson"
+                local cipher = cjson.decode(body)
+                local blob = cipher["GenerateDataKeyResponse"]["GenerateDataKeyResult"]["CiphertextBlob"]
+                -- local blob = "CiBqGtLctbehq6wBcoXkGroAGoExTJTHN75gf8bc15CNcBKnAQEBAwB4ahrS3LW3oausAXKF5Bq6ABqBMUyUxze+YH/G3NeQjXAAAAB+MHwGCSqGSIb3DQEHBqBvMG0CAQAwaAYJKoZIhvcNAQcBMB4GCWCGSAFlAwQBLjARBAwnIHmkXZ82NygtOUUCARCAO2NKpJIij7RLjwIx1VvZeDhmLfqxUHQm6a/867+khZbbP7rnViEEov9HqNaKCYrrJ/izW2ALs7l38GKy"
+                ngx.say("BLOB:" .. blob)
+                ok, code, headers, status, body  = service:performAction("Decrypt", {CiphertextBlob=blob}, path, "POST", true, 120000 )
+
                 ngx.say(status)
                 ngx.say(body)
             ';
@@ -94,9 +86,12 @@ __DATA__
 --- more_headers
 X-Test: test
 --- request
-POST /test-signature?Action=GenerateDataKey
+GET /test-signature?Action=GenerateDataKey
 --- response_body_like eval
 [".*PublishResult.*ResponseMetadata.*"]
 --- error_code: 200
 --- no_error_log
 [error]
+
+
+

@@ -15,6 +15,15 @@ local DEFAULT_SECURITY_CREDENTIALS_PORT = "80"
 local DEFAULT_SECURITY_CREDENTIALS_URL = "/latest/meta-data/iam/security-credentials/"
 local DEFAULT_TOKEN_EXPIRATION = 3600 -- in seconds
 
+-- per nginx process cache to store IAM credentials
+local cache = {
+    AccessKeyId = nil,
+    SecretAccessKey = nil,
+    Token = nil,
+    ExpireAt = nil,
+    ExpireAtTimestamp = nil
+}
+
 local AWSIAMCredentials = {}
 
 function AWSIAMCredentials:new(o)
@@ -27,17 +36,33 @@ function AWSIAMCredentials:new(o)
         self.security_credentials_host = o.security_credentials_host or DEFAULT_SECURITY_CREDENTIALS_HOST
         self.security_credentials_port = o.security_credentials_port or DEFAULT_SECURITY_CREDENTIALS_PORT
         self.security_credentials_url = o.security_credentials_url or DEFAULT_SECURITY_CREDENTIALS_URL
-        self.loggerSharedDict = ngx.shared[o.sharedDict]
     end
     return o
+end
+
+local function getTimestamp(dateString, convertToUTC)
+    local pattern = "(%d+)%-(%d+)%-(%d+)T(%d+):(%d+):(%d+)Z"
+    local xyear, xmonth, xday, xhour, xminute,
+    xseconds, xoffset, xoffsethour, xoffsetmin = dateString:match(pattern)
+    local convertedTimestamp = os.time({
+        year = xyear,
+        month = xmonth,
+        day = xday,
+        hour = xhour,
+        min = xminute,
+        sec = xseconds
+    })
+    if (convertToUTC == true) then
+        local offset = os.time() - os.time(os.date("!*t"))
+        convertedTimestamp = convertedTimestamp + offset
+    end
+    return convertedTimestamp
 end
 
 
 function AWSIAMCredentials:fetchSecurityCredentialsFromAWS()
     local iamURL = self.security_credentials_url .. self.iam_user .. "?DurationSeconds=" .. self.security_credentials_timeout
 
-    -- expire the keys in the shared dict 6 seconds before the aws keys expire
-    local expire_at = self.security_credentials_timeout - 6
     local hc1 = http:new()
 
     local ok, code, headers, status, body = hc1:request{
@@ -52,12 +77,13 @@ function AWSIAMCredentials:fetchSecurityCredentialsFromAWS()
     local aws_response = cjson.decode(body)
 
     if (aws_response["Code"] == "Success") then
-        local loggerDict = self.loggerSharedDict
         -- set the values and the expiry time
-        loggerDict:set("AccessKeyId", aws_response["AccessKeyId"], expire_at)
-        loggerDict:set("SecretAccessKey", aws_response["SecretAccessKey"], expire_at)
+        cache.AccessKeyId = aws_response["AccessKeyId"]
+        cache.SecretAccessKey = aws_response["SecretAccessKey"]
         local token = url:encodeUrl(aws_response["Token"])
-        loggerDict:set("Token", token, expire_at)
+        cache.Token = token
+        cache.ExpireAt = aws_response["Expiration"]
+        cache.ExpireAtTimestamp = getTimestamp(cache.ExpireAt)
     end
 
     return ok
@@ -68,17 +94,15 @@ function AWSIAMCredentials:updateSecurityCredentials()
 end
 
 function AWSIAMCredentials:getSecurityCredentials()
-    local accessKeyId = self.loggerSharedDict:get("AccessKeyId")
+    -- http://wiki.nginx.org/HttpLuaModule#ngx.time
+    local now_in_secs = ngx.time
+    local expireAtTimestamp = cache.ExpireAtTimestamp or now_in_secs
 
-    if (accessKeyId == nil) then
+    if (now_in_secs >= expireAtTimestamp - 3 or cache.Token == nil or cache.SecretAccessKey == nil or cache.AccessKeyId == nil) then
         self:updateSecurityCredentials()
     end
 
-    local accessKeyId = self.loggerSharedDict:get("AccessKeyId")
-    local secretAccessKey = self.loggerSharedDict:get("SecretAccessKey")
-    local token = self.loggerSharedDict:get("Token")
-
-    return accessKeyId, secretAccessKey, token
+    return cache.AccessKeyId, cache.SecretAccessKey, cache.Token
 end
 
 return AWSIAMCredentials
