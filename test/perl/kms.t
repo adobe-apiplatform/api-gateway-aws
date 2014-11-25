@@ -75,7 +75,7 @@ __DATA__
                 local cjson = require"cjson"
                 local cipher = cjson.decode(body)
                 local blob = cipher["GenerateDataKeyResponse"]["GenerateDataKeyResult"]["CiphertextBlob"]
-                -- local blob = "CiBqGtLctbehq6wBcoXkGroAGoExTJTHN75gf8bc15CNcBKnAQEBAwB4ahrS3LW3oausAXKF5Bq6ABqBMUyUxze+YH/G3NeQjXAAAAB+MHwGCSqGSIb3DQEHBqBvMG0CAQAwaAYJKoZIhvcNAQcBMB4GCWCGSAFlAwQBLjARBAwnIHmkXZ82NygtOUUCARCAO2NKpJIij7RLjwIx1VvZeDhmLfqxUHQm6a/867+khZbbP7rnViEEov9HqNaKCYrrJ/izW2ALs7l38GKy"
+                local blob = "CiBqGtLctbehq6wBcoXkGroAGoExTJTHN75gf8bc15CNcBKnAQEBAwB4ahrS3LW3oausAXKF5Bq6ABqBMUyUxze+YH/G3NeQjXAAAAB+MHwGCSqGSIb3DQEHBqBvMG0CAQAwaAYJKoZIhvcNAQcBMB4GCWCGSAFlAwQBLjARBAxCWQz4VAlKxYYtnQACARCAO/519dhWwSzweyXMjRWz/gElI2DM8lJu6WVPhF3tB/MwEfGB87stexHaHhxqQsx8uhtmp8PqXZ+Iu6LX"
                 ngx.say("BLOB:" .. blob)
                 ok, code, headers, status, body  = service:performAction("Decrypt", {CiphertextBlob=blob}, path, "POST", true, 120000 )
 

@@ -130,7 +130,7 @@ function _M:performAction(actionName, arguments, path, http_method, useSSL, time
 
     if request_method ~= "GET" then
         uri_args = {}
-        request_body = query_string
+        request_body = cjson.encode(arguments) -- query_string
     end
 
     local scheme = "http"
@@ -143,11 +143,14 @@ function _M:performAction(actionName, arguments, path, http_method, useSSL, time
 
     local authorization, awsAuth = self:getAuthorizationHeader(request_method, request_path, uri_args, request_body)
 
+    local t = "TrentService." .. actionName
     local request_headers = {
                     Authorization = authorization,
                     ["X-Amz-Date"] = awsAuth.aws_date,
                     ["Accept"] = "application/json",
-                    ["Content-Type"] = "application/x-www-form-urlencoded"
+--                    ["Content-Type"] = "application/x-www-form-urlencoded",
+                    ["Content-Type"] = "application/x-amz-json-1.1",
+                    ["X-Amz-Target"] = t
     }
 
     if request_method == "GET" then
