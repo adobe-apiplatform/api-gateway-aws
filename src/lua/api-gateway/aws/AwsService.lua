@@ -46,12 +46,12 @@ function _M:throwIfInitParamsInvalid(o)
     local secret_key = o.aws_secret_key or ""
     local access_key = o.aws_access_key or ""
 
-    local s = ""
-    for k,v in pairs(o) do
-        s = s .. ", " .. k .. "=" .. v
-    end
 
     if iam_user == "" and secret_key == "" and access_key == "" then
+        local s = ""
+        for k,v in pairs(o) do
+            s = s .. ", " .. k .. "=" .. v
+        end
         error("Invalid credentials. At least aws_iam_user or (aws_secret_key,aws_access_key) need to be provided. Object is:" .. s)
     end
 
