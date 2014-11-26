@@ -15,6 +15,28 @@ my $pwd = cwd();
 my $aws_client_id = "replace-me";
 my $aws_secret = "replace-me";
 
+# try to read the nameservers used by the system resolver:
+my @nameservers;
+if (open my $in, "/etc/resolv.conf") {
+    while (<$in>) {
+        if (/^\s*nameserver\s+(\d+(?:\.\d+){3})(?:\s+|$)/) {
+            push @nameservers, $1;
+            if (@nameservers > 10) {
+                last;
+            }
+        }
+    }
+    close $in;
+}
+
+if (!@nameservers) {
+    # default to Google's open DNS servers
+    push @nameservers, "8.8.8.8", "8.8.4.4";
+}
+
+
+warn "Using nameservers: \n@nameservers\n";
+
 our $HttpConfig = <<_EOC_;
     # lua_package_path "$pwd/scripts/?.lua;;";
     lua_package_path 'src/lua/?.lua;;';
@@ -24,6 +46,7 @@ our $HttpConfig = <<_EOC_;
         v.on("$Test::Nginx::Util::ErrLogFile")
         require "resty.core"
     ';
+    resolver @nameservers;
 _EOC_
 
 #no_diff();
@@ -38,22 +61,18 @@ __DATA__
 --- config
         location /test-signature {
             # stg:  :
-            set $aws_access_key AKIAILORHB743FMVEP2LLDA;
-            set $aws_secret_key H6i7wSYrtQPWL/523+L8g5lZmWWugMoAz4JnJJfLLb;
+            set $aws_access_key AKIAILORHBFMVEP2LLDA;
+            set $aws_secret_key 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;
             set $aws_region us-east-1;
             set $aws_service kms;
 
-            #resolver 8.8.8.8;
-            resolver 10.8.4.247;
-
             content_by_lua '
-
+                local cjson = require"cjson"
                 local host = ngx.var.aws_service .."." .. ngx.var.aws_region .. ".amazonaws.com"
 
                 local o = {
-                    KeyId   =  "alias/GW-CACHE-MK",
+                    KeyId   =  "alias/test",
                     KeySpec = "AES_256",
-                    --NumberOfBytes = 128
                 }
 
                 local path = "/"
@@ -66,23 +85,38 @@ __DATA__
                     aws_secret_key = ngx.var.aws_secret_key,
                     aws_access_key = ngx.var.aws_access_key
                 })
+
+                -- discover the aliases
                 local ok, code, headers, status, body  = service:performAction("ListAliases", {}, path, ngx.var.request_method, true, 120000 )
                 ngx.say(status)
                 ngx.say(body)
 
+                -- pick the first alias
+                local responseObject = cjson.decode(body)
+                o.KeyId = responseObject.ListAliasesResponse.ListAliasesResult.Aliases[1].AliasName
+                ngx.say("KEY ALIAS:" .. tostring(o.KeyId))
+
+                -- generate a data key
                 ok, code, headers, status, body  = service:performAction("GenerateDataKey", o, path, ngx.var.request_method, true, 120000 )
                 ngx.say(status)
                 ngx.say(body)
 
-                local cjson = require"cjson"
+                -- decode the data key back
                 local cipher = cjson.decode(body)
                 local blob = cipher["GenerateDataKeyResponse"]["GenerateDataKeyResult"]["CiphertextBlob"]
+                local blob_text = cipher["GenerateDataKeyResponse"]["GenerateDataKeyResult"]["Plaintext"]
+
                 --local blob = "CiBqGtLctbehq6wBcoXkGroAGoExTJTHN75gf8bc15CNcBKnAQEBAwB4ahrS3LW3oausAXKF5Bq6ABqBMUyUxze+YH/G3NeQjXAAAAB+MHwGCSqGSIb3DQEHBqBvMG0CAQAwaAYJKoZIhvcNAQcBMB4GCWCGSAFlAwQBLjARBAxCWQz4VAlKxYYtnQACARCAO/519dhWwSzweyXMjRWz/gElI2DM8lJu6WVPhF3tB/MwEfGB87stexHaHhxqQsx8uhtmp8PqXZ+Iu6LX"
                 ngx.say("BLOB:" .. blob)
                 ok, code, headers, status, body  = service:performAction("Decrypt", {CiphertextBlob=blob}, path, "POST", true, 120000 )
 
                 ngx.say(status)
                 ngx.say(body)
+
+                local decoded = cjson.decode(body)
+                if decoded.Plaintext ~= blob_text then
+                    error( "AWS Error", blob_text , " does not match ", decoded.Plaintext )
+                end
             ';
         }
 --- more_headers
@@ -90,7 +124,7 @@ X-Test: test
 --- request
 GET /test-signature?Action=GenerateDataKey
 --- response_body_like eval
-[".*PublishResult.*ResponseMetadata.*"]
+[".*(HTTP/1\\.1\\s200\\sOK).*(HTTP/1\\.1\\s200\\sOK).*(HTTP/1\\.1\\s200\\sOK).*"]
 --- error_code: 200
 --- no_error_log
 [error]
