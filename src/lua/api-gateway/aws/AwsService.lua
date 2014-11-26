@@ -28,10 +28,12 @@ local http_client = http:new()
 --
 -- NOTE: class inheirtance inspired from: http://www.lua.org/pil/16.2.html
 function _M:new(o)
-    o = o or {}
+    local o = o or {}
     setmetatable(o, self)
     self.__index = self
-    self:throwIfInitParamsInvalid(o)
+    if not o.___super then
+        self:throwIfInitParamsInvalid(o)
+    end
     return o
 end
 
@@ -44,8 +46,13 @@ function _M:throwIfInitParamsInvalid(o)
     local secret_key = o.aws_secret_key or ""
     local access_key = o.aws_access_key or ""
 
+    local s = ""
+    for k,v in pairs(o) do
+        s = s .. ", " .. k .. "=" .. v
+    end
+
     if iam_user == "" and secret_key == "" and access_key == "" then
-        error("Invalid credentials. At least aws_iam_user or (aws_secret_key,aws_access_key) need to be provided.")
+        error("Invalid credentials. At least aws_iam_user or (aws_secret_key,aws_access_key) need to be provided. Object is:" .. s)
     end
 
     local service = o.aws_service or ""
@@ -61,7 +68,7 @@ end
 
 function _M:debug(...)
     if debug_mode then
-        ngx.log(ngx.DEBUG, "validator: ", ...)
+        ngx.log(ngx.DEBUG, "AwsService: ", ...)
     end
 end
 
@@ -100,7 +107,7 @@ function _M:getRequestArguments(actionName, parameters)
     local urlencoded_args = "Action=" .. actionName
     if parameters ~= nil then
         for key,value in pairs(parameters) do
-            urlencoded_args = urlencoded_args .. "&" .. key .. "=" .. value
+            urlencoded_args = urlencoded_args .. "&" .. key .. "=" .. (value or "")
         end
     end
     return urlencoded_args
