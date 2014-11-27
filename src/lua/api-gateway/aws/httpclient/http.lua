@@ -1,8 +1,9 @@
 
 -- global variables
-local url = require "api-gateway.logger.url"
+local url = require "api-gateway.aws.httpclient.url"
 local tcp = ngx.socket.tcp
 local base64 = ngx.encode_base64
+local debug_mode = ngx.config.debug
 
 -- constants
 -- connection timeout in seconds
@@ -12,7 +13,7 @@ local PORT = 80
 
 local _M = { _VERSION = '0.2' }
 -- user agent field sent in request
-local USERAGENT = 'api-gateway.logger.http/' .. _M._VERSION
+local USERAGENT = 'api-gateway.aws.httpclient.http/' .. _M._VERSION
 
 local mt = { __index = _M }
 
@@ -24,6 +25,11 @@ local default = {
     scheme = "http"
 }
 
+local function debug(...)
+    if debug_mode then
+        ngx.log(ngx.DEBUG, "HttpClient.Http: ", ...)
+    end
+end
 
 local function adjusturi(reqt)
     local u = reqt
@@ -250,16 +256,21 @@ function _M.request(self, reqt)
 
     local nreqt = adjustrequest(reqt)
 
+    debug("initiating request to:", nreqt.host, nreqt.port)
+
     local sock = tcp()
     if not sock then
+        debug("failed to create socket")
         return nil, "create sock failed"
     end
+
 
     sock:settimeout(nreqt.timeout)
 
     -- connect
     ok, err = sock:connect(nreqt.host, nreqt.port)
     if err then
+        debug("Sock connection failed. Could not connect to:", nreqt.host, nreqt.port )
         return nil, "sock connected failed " .. err
     end
 
@@ -270,6 +281,7 @@ function _M.request(self, reqt)
 --        end
         local ok, err = sock:sslhandshake(nreqt.host, verify)
         if not ok then
+            debug("SSL Handshake error. Error:", err, ", Host:", nreqt.host )
             return nil, err
         end
     end
@@ -304,6 +316,7 @@ function _M.request(self, reqt)
     bytes, err = sock:send(reqline .. h)
     if err then
         sock:close()
+        debug("Socket Send Error:", err, ", Host:", nreqt.host, ", Request Line:", reqline .. h)
         return nil, err
     end
 
@@ -311,6 +324,7 @@ function _M.request(self, reqt)
     if req_body_type == 'string' then
         bytes, err = sock:send(req_body)
         if err then
+            debug("Error sending request body:", req_body, ", Host:", nreqt.host)
             sock:close()
             return nil, err
         end
@@ -381,7 +395,7 @@ function _M.request(self, reqt)
     end
 
     if nreqt.keepalive then
-        sock:setkeepalive(nreqt.keepalive)
+        sock:setkeepalive(nreqt.keepalive, (nreqt.poolsize or 30))
     else
         sock:close()
     end

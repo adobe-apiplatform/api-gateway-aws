@@ -165,8 +165,14 @@ function _M:performAction(actionName, arguments, path, http_method, useSSL, time
         request_path = request_path .. "?" .. query_string
     end
 
-    self:debug("Calling AWS:", request_method, " ", scheme, "://", host, ":", port, "/", request_path, " ",  request_body)
-    self:debug("AWS Header:", "Authorization:", authorization, "X-Amz-Date", awsAuth.aws_date )
+    if ( self.aws_debug == true ) then
+        ngx.log(ngx.WARN, "Calling AWS:", request_method, " ", scheme, "://", host, ":", port, "/", request_path, ". Body=",  request_body)
+        local s = ""
+        for k,v in pairs(request_headers) do
+            s = s .. ", " .. k .. "=" .. v
+        end
+        ngx.log(ngx.WARN, "Calling AWS with Headers:", s )
+    end
 
     local ok, code, headers, status, body  = self:getHttpClient():request( self:getRequestObject({
             scheme = scheme,
@@ -176,8 +182,18 @@ function _M:performAction(actionName, arguments, path, http_method, useSSL, time
             host = host,
             body = request_body,
             method = request_method,
-            headers = request_headers
+            headers = request_headers,
+            keepalive = self.aws_conn_keepalive or 30000, -- 30s keepalive
+            poolsize = self.aws_conn_pool or 100     -- max number of connections allowed in the connection pool
     }) )
+
+    if (self.aws_debug == true ) then
+        local s = ""
+        for k,v in pairs(headers) do
+            s = s .. ", " .. k .. "=" .. v
+        end
+        ngx.log(ngx.WARN, "AWS Response:", "code=", code, ", headers=", s, ", status=", status, ", body=", body)
+    end
 
     return ok, code, headers, status, body
 end
