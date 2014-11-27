@@ -72,7 +72,10 @@ __DATA__
                 local service = KmsService:new({
                     aws_region = ngx.var.aws_region,
                     aws_secret_key = ngx.var.aws_secret_key,
-                    aws_access_key = ngx.var.aws_access_key
+                    aws_access_key = ngx.var.aws_access_key,
+                    aws_debug = true,              -- print warn level messages on the nginx logs
+                    aws_conn_keepalive = 60000,    -- how long to keep the sockets used for AWS alive
+                    aws_conn_pool = 100            -- the connection pool size for sockets used to connect to AWS
                 })
 
                 -- search for aliases
