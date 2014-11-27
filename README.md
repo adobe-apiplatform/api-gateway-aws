@@ -1,7 +1,8 @@
 api-gateway-aws
 ===============
 
-Lua module for AWS APIs . The missing AWS SDK from Nginx/Openresty
+Lua module for AWS APIs . The missing AWS SDK from Nginx/Openresty.
+Use it to proxy AWS APIs in a simple fashion, with any Http Client that you prefer.
 
 Table of Contents
 =================
@@ -17,6 +18,9 @@ Status
 
 This library is considered production ready.
 
+It needs a bit of love to support more AWS APIs as the list of APIs is small at the moment.
+But even if not all AWS APIs are exposed via Lua class wrappers, you can still use any AWS API via a generic Lua wrapper `AwsService`.
+
 Description
 ===========
 
@@ -24,10 +28,31 @@ This library requires an nginx build with OpenSSL,
 the [ngx_lua module](http://wiki.nginx.org/HttpLuaModule), [LuaJIT 2.0](http://luajit.org/luajit.html) and
 [api-gateway-hmac](https://git.corp.adobe.com/adobe-apis/api-gateway-hmac) module.
 
+## AWS V4 Signature
+This library supports the latest AWS V4 signature which means you can use any of the latest AWS APIs without any problem.
+
+## AwsService wrapper
+`AwsService` is a generic Lua class to interact with any AWS API. All the actual implementations extend form this class.
+ It's very straight forward to configure it:
+
+ ```lua
+ local service = AwsService:new({
+         aws_service = "sns",
+         aws_region = "us-east-1",
+         aws_secret_key = "--replace--me",
+         aws_access_key = "--replace--me",
+         aws_debug = true,              -- print warn level messages on the nginx logs. useful for debugging
+         aws_conn_keepalive = 60000,    -- how long to keep the sockets used for AWS open
+         aws_conn_pool = 100            -- the connection pool size for sockets used to connect to AWS
+     })
+ ```
+
 
 Synopsis
 ========
+
 ```lua
+
 ```
 
 [Back to TOC](#table-of-contents)
