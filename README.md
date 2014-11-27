@@ -28,10 +28,10 @@ This library requires an nginx build with OpenSSL,
 the [ngx_lua module](http://wiki.nginx.org/HttpLuaModule), [LuaJIT 2.0](http://luajit.org/luajit.html) and
 [api-gateway-hmac](https://git.corp.adobe.com/adobe-apis/api-gateway-hmac) module.
 
-## AWS V4 Signature
+### AWS V4 Signature
 This library supports the latest AWS V4 signature which means you can use any of the latest AWS APIs without any problem.
 
-## AwsService wrapper
+### AwsService wrapper
 `AwsService` is a generic Lua class to interact with any AWS API. All the actual implementations extend form this class.
  It's very straight forward to configure it:
 
@@ -51,7 +51,55 @@ This library supports the latest AWS V4 signature which means you can use any of
 Synopsis
 ========
 
+### SNS
+
 ```lua
+
+    local SnsService = require "api-gateway.aws.sns.SnsService"
+    local service = SnsService:new({
+        aws_region = ngx.var.aws_region,
+        aws_secret_key = ngx.var.aws_secret_key,
+        aws_access_key = ngx.var.aws_access_key
+    })
+
+    -- ListTopics
+    local list  = service:listTopics()
+    local topicArn = list.ListTopicsResponse.ListTopicsResult.Topics[1].TopicArn
+
+    -- Publish
+    local response = service:publish("test-subject","test-message", topicArn)
+    local messageId = response.PublishResponse.PublishResult.MessageId
+
+```
+
+### KMS
+
+```lua
+
+       local KmsService = require "api-gateway.aws.kms.KmsService"
+
+       local service = KmsService:new({
+           aws_region = ngx.var.aws_region,
+           aws_secret_key = ngx.var.aws_secret_key,
+           aws_access_key = ngx.var.aws_access_key
+       })
+
+       -- search for aliases
+       local list  = service:listAliases()
+
+       -- pick the first alias
+       local KeyId = list.Aliases[1].AliasName
+
+       -- generate a data key
+       local cipher = service:generateDataKey(KeyId, "AES_256")
+       local blob = cipher.CiphertextBlob
+       local blob_text = cipher.Plaintext
+
+       -- encrypt a text
+       local encryptResult = service:encrypt(KeyId, blob_text)
+
+       -- decrypt
+       local decryptResult = service:decrypt(encryptResult.CiphertextBlob)
 
 ```
 

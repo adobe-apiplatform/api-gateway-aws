@@ -59,7 +59,7 @@ __DATA__
 === TEST 1: test GenerateDataKey with Generic AwsService
 --- http_config eval: $::HttpConfig
 --- config
-        location /test-signature {
+        location /test {
             # stg:  :
             set $aws_access_key AKIAILOR777HBFMVEP2LLDA;
             set $aws_secret_key H6i7wSYrtQPWL/523+L8g5lZmWWugMoAz4JnJJfLLb;
@@ -67,9 +67,9 @@ __DATA__
             set $aws_service kms;
 
             content_by_lua '
-                local KmsService = require "api-gateway.aws.kms.KmsService"
+                local SnsService = require "api-gateway.aws.sns.SnsService"
 
-                local service = KmsService:new({
+                local service = SnsService:new({
                     aws_region = ngx.var.aws_region,
                     aws_secret_key = ngx.var.aws_secret_key,
                     aws_access_key = ngx.var.aws_access_key,
@@ -79,39 +79,25 @@ __DATA__
                 })
 
                 -- search for aliases
-                local list  = service:listAliases()
-                assert(list ~= nil, "ListAliases should return at least 1 key")
+                local list  = service:listTopics()
+                assert(list ~= nil, "ListTopics should return at least 1 topic")
 
-                -- pick the first alias
-                local KeyId = list.Aliases[1].AliasName
-                ngx.say("KEY ALIAS:" .. tostring(KeyId))
+                -- pick the first topic
+                local topicArn = list.ListTopicsResponse.ListTopicsResult.Topics[1].TopicArn
+                assert(topicArn ~= nil, "Topic not found.")
+                ngx.say("TopicARN:" .. tostring(topicArn))
 
-                -- generate a data key
-                local cipher = service:generateDataKey(KeyId, "AES_256")
-                local blob = cipher.CiphertextBlob
-                local blob_text = cipher.Plaintext
-                ngx.say("BLOB:" .. blob)
-
-                local decoded = service:decrypt(blob)
-                if decoded.Plaintext ~= blob_text then
-                    error( "KMS Error: [" .. blob_text .. "] does not match [" .. decoded.Plaintext .. "]" )
-                end
-
-                -- encrypt a text
-                local encryptResult = service:encrypt(KeyId, blob_text)
-                local decryptResult = service:decrypt(encryptResult.CiphertextBlob)
-
-                if decryptResult.Plaintext ~= blob_text then
-                    error( "KMS Encrypt/Decrypt Error: [" .. blob_text .. "] does not match [" .. decryptResult.Plaintext .. "]" )
-                end
+                local response = service:publish("test-subject","test-message-from-openresty-unit-test", topicArn)
+                local messageId = response.PublishResponse.PublishResult.MessageId
+                ngx.say("Message_ID:" .. tostring(messageId))
             ';
         }
 --- more_headers
 X-Test: test
 --- request
-GET /test-signature?Action=GenerateDataKey
+GET /test
 --- response_body_like eval
-[".*KEY\\sALIAS\\:.*BLOB\\:.*"]
+[".*TopicARN:arn:aws:sns:.*Message_ID:[a-zA-Z0-9]{8}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{12}"]
 --- error_code: 200
 --- no_error_log
 [error]
