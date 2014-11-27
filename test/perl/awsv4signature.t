@@ -47,7 +47,7 @@ X-Test: test
 --- request
 POST /test-signature?Subject=nginx:test!@$&TopicArn=arn:aws:sns:us-east-1:492299007544:apiplatform-dev-ue1-topic-analytics&Message=hello_from_nginx!&Action=Publish&Subject1=nginx:test
 --- response_body eval
-["Action=Publish&Message=hello_from_nginx%21&Subject=nginx%3Atest%21%40%24&Subject1=nginx%3Atest&TopicArn=arn%3Aaws%3Asns%3Aus-east-1%3A492299007544%3Aapiplatform-dev-ue1-topic-analytics"]
+["Action=Publish&Message=hello_from_nginx!&Subject=nginx%3Atest!\@\$&Subject1=nginx%3Atest&TopicArn=arn%3Aaws%3Asns%3Aus-east-1%3A492299007544%3Aapiplatform-dev-ue1-topic-analytics"]
 --- error_code: 200
 --- no_error_log
 [error]
