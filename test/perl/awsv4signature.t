@@ -58,6 +58,8 @@ POST /test-signature?Subject=nginx:test!@$&TopicArn=arn:aws:sns:us-east-1:492299
         location /test-signature {
             set $aws_access_key AKIAIBF2BKMFXSCLCR4Q;
             set $aws_secret_key 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;
+            # set $aws_access_key $TEST_NGINX_AWS_CLIENT_ID;
+            # set $aws_secret_key $TEST_NGINX_AWS_SECRET;
             set $aws_region us-east-1;
             set $aws_service sns;
 
@@ -124,6 +126,8 @@ POST /test-signature?Action=Publish&Message=POST-cosocket-is-awesome&Subject=ngi
         location /test-signature {
             set $aws_access_key AKIAIBF2BKMFXSCLCR4Q;
             set $aws_secret_key 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;
+            # set $aws_access_key $TEST_NGINX_AWS_CLIENT_ID;
+            # set $aws_secret_key $TEST_NGINX_AWS_SECRET;
             set $aws_region us-east-1;
             set $aws_service sns;
 

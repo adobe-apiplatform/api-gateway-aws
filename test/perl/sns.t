@@ -12,8 +12,6 @@ repeat_each(1);
 plan tests => repeat_each() * (blocks() * 4)-1;
 
 my $pwd = cwd();
-my $aws_client_id = "replace-me";
-my $aws_secret = "replace-me";
 
 # try to read the nameservers used by the system resolver:
 my @nameservers;
@@ -61,8 +59,8 @@ __DATA__
 --- config
         location /test {
             # stg:  :
-            set $aws_access_key AKIAILOR777HBFMVEP2LLDA;
-            set $aws_secret_key H6i7wSYrtQPWL/523+L8g5lZmWWugMoAz4JnJJfLLb;
+            set $aws_access_key $TEST_NGINX_AWS_CLIENT_ID;
+            set $aws_secret_key $TEST_NGINX_AWS_SECRET;
             set $aws_region us-east-1;
             set $aws_service kms;
 

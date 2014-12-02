@@ -125,20 +125,21 @@ Test files are located in `test/perl`.
 The other libraries such as `Redis`, `test-nginx` are located in `test/resources/`.
 Other files used when running the test are also located in `test/resources`.
 
-## Build locally
- ```
-sudo LUA_LIB_DIR=/usr/local/api-gateway/lualib make install
- ```
-
 To execute the test issue the following command:
  ```
- make test
+ TEST_NGINX_AWS_CLIENT_ID="--change--me" TEST_NGINX_AWS_SECRET="--change-me--" make test
  ```
 
  If you want to run a single test, the following command helps:
  ```
+ TEST_NGINX_AWS_CLIENT_ID="--change--me" TEST_NGINX_AWS_SECRET="--change-me--"  \
  PATH=/usr/local/sbin:$PATH TEST_NGINX_SERVROOT=`pwd`/target/servroot TEST_NGINX_PORT=1989 prove -I ./test/resources/test-nginx/lib -r ./test/perl/awsv4signature.t
  ```
  This command only executes the test `awsv4signature.t`.
+
+## Build locally
+ ```
+sudo LUA_LIB_DIR=/usr/local/api-gateway/lualib make install
+ ```
 
 [Back to TOC](#table-of-contents)
