@@ -103,8 +103,8 @@ end
 --        "Plaintext": blob
 --    }
 function _M:encrypt(keyId, plaintext, encryptionContext, grantTokens)
-    assert(type(keyId) == "string", "generateDataKey() expects a valid keyId as the first argument")
-    assert(type(plaintext) == "string", "generateDataKey() expects a valid plaintext as the second argument")
+    assert(type(keyId) == "string", "encrypt() expects a valid keyId as the first argument")
+    assert(type(plaintext) == "string", "encrypt() expects a valid plaintext as the second argument")
     local arguments = {
         KeyId = keyId,
         Plaintext = plaintext,
