@@ -13,10 +13,12 @@ local url = require"api-gateway.aws.httpclient.url"
 local DEFAULT_SECURITY_CREDENTIALS_HOST = "169.254.169.254"
 local DEFAULT_SECURITY_CREDENTIALS_PORT = "80"
 local DEFAULT_SECURITY_CREDENTIALS_URL = "/latest/meta-data/iam/security-credentials/"
+-- use GET /latest/meta-data/iam/security-credentials/ to auto-discover the IAM Role
 local DEFAULT_TOKEN_EXPIRATION = 3600 -- in seconds
 
 -- per nginx process cache to store IAM credentials
 local cache = {
+    IamUser = nil,
     AccessKeyId = nil,
     SecretAccessKey = nil,
     Token = nil,
@@ -56,12 +58,43 @@ local function getTimestamp(dateString, convertToUTC)
         local offset = os.time() - os.time(os.date("!*t"))
         convertedTimestamp = convertedTimestamp + offset
     end
-    return convertedTimestamp
+    return tonumber(convertedTimestamp)
 end
 
+---
+--  Auto discover the IAM User
+function AWSIAMCredentials:fetchIamUser()
+    local hc1 = http:new()
 
+    local ok, code, headers, status, body = hc1:request{
+        host = self.security_credentials_host,
+        port = self.security_credentials_port,
+        url = self.security_credentials_url,
+        method = "GET",
+        keepalive = 30000, -- 30s keepalive
+        poolsize = 50
+    }
+
+    if (code == ngx.HTTP_OK and body ~= nil) then
+        cache.IamUser = body
+        return cache.IamUser
+    end
+    ngx.log(ngx.WARN, "Could not fetch iam user from:", self.security_credentials_host, ":", self.security_credentials_port, self.security_credentials_url)
+    return nil
+end
+
+function AWSIAMCredentials:getIamUser()
+    local cachedIamUser = self.iam_user or cache.IamUser
+    if ( cachedIamUser ~= nil ) then
+        return cachedIamUser, true
+    end
+    return self:fetchIamUser(), false
+end
+
+---
+--  Get credentials for the IAM User
 function AWSIAMCredentials:fetchSecurityCredentialsFromAWS()
-    local iamURL = self.security_credentials_url .. self.iam_user .. "?DurationSeconds=" .. self.security_credentials_timeout
+    local iamURL = self.security_credentials_url .. self:getIamUser() .. "?DurationSeconds=" .. self.security_credentials_timeout
 
     local hc1 = http:new()
 
@@ -69,10 +102,12 @@ function AWSIAMCredentials:fetchSecurityCredentialsFromAWS()
         host = self.security_credentials_host,
         port = self.security_credentials_port,
         url = iamURL,
-        method = "GET"
+        method = "GET",
+        keepalive = 30000, -- 30s keepalive
+        poolsize = 50
     }
 
-    ngx.log(ngx.DEBUG, "IAM RESPONSE:" .. tostring(body))
+    ngx.log(ngx.DEBUG, "fetchSecurityCredentialsFromAWS() AWS Response:" .. tostring(body))
 
     local aws_response = cjson.decode(body)
 
@@ -83,26 +118,30 @@ function AWSIAMCredentials:fetchSecurityCredentialsFromAWS()
         local token = url:encodeUrl(aws_response["Token"])
         cache.Token = token
         cache.ExpireAt = aws_response["Expiration"]
-        cache.ExpireAtTimestamp = getTimestamp(cache.ExpireAt)
+        cache.ExpireAtTimestamp = getTimestamp(cache.ExpireAt, true)
+        return true
     end
 
-    return ok
-end
-
-function AWSIAMCredentials:updateSecurityCredentials()
-    self:fetchSecurityCredentialsFromAWS()
+    ngx.log(ngx.WARN, "Could not read credentials from:", self.security_credentials_host, ":", self.security_credentials_port, iamURL)
+    return false
 end
 
 function AWSIAMCredentials:getSecurityCredentials()
-    -- http://wiki.nginx.org/HttpLuaModule#ngx.time
-    local now_in_secs = ngx.time
-    local expireAtTimestamp = cache.ExpireAtTimestamp or now_in_secs
-
-    if (now_in_secs >= expireAtTimestamp - 3 or cache.Token == nil or cache.SecretAccessKey == nil or cache.AccessKeyId == nil) then
-        self:updateSecurityCredentials()
+    if ( cache.Token == nil or cache.SecretAccessKey == nil or cache.AccessKeyId == nil) then
+        ngx.log(ngx.DEBUG, "getSecurityCredentials(): Obtaining a new token as the cache is empty." )
+        self:fetchSecurityCredentialsFromAWS()
     end
 
-    return cache.AccessKeyId, cache.SecretAccessKey, cache.Token
+    -- http://wiki.nginx.org/HttpLuaModule#ngx.time
+    local now_in_secs = ngx.time()
+    local expireAtTimestamp = cache.ExpireAtTimestamp or now_in_secs
+
+    if (now_in_secs >= expireAtTimestamp ) then
+        ngx.log(ngx.DEBUG, "getSecurityCredentials(): Current token expired " .. tostring(expireAtTimestamp-now_in_secs) .. " seconds ago. Obtaining a new token." )
+        self:fetchSecurityCredentialsFromAWS()
+    end
+
+    return cache.AccessKeyId, cache.SecretAccessKey, cache.Token, cache.ExpireAt, cache.ExpireAtTimestamp
 end
 
 return AWSIAMCredentials
