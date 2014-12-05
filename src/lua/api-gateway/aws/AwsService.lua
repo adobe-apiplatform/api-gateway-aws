@@ -27,13 +27,13 @@ local iam_credentials
 --     o.aws_service     - the AWS Service to call
 --     o.aws_secret_key  - AWS Credential
 --     o.aws_access_key  - AWS Credential
---     o.aws_iam_user    - required if aws_secret_key,aws_access_key pair is missing
+--     o.aws_iam_user    - optional. if aws_secret_key,aws_access_key pair is missing you can provide an iam_user
+--     o.security_credentials_host - optional. the AWS URL to read security credentials from and figure out the iam_user
+--     o.security_credentials_port - optional. the port used when connecting to security_credentials_host
 --
 -- NOTE: class inheirtance inspired from: http://www.lua.org/pil/16.2.html
 function _M:new(o)
     ngx.log(ngx.DEBUG, "AwsService() supercls=", tostring(o.___super) )
-    ngx.log(ngx.DEBUG, "_M=", tostring(_M), ", self=", tostring(self))
-    ngx.log(ngx.DEBUG, "o=", tostring(o))
     local o = o or {}
     setmetatable(o, self)
     self.__index = self
