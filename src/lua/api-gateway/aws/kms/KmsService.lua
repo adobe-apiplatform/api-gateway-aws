@@ -6,21 +6,30 @@
 -- To change this template use File | Settings | File Templates.
 
 
---- AwsHttpRequest (HttpAWSApi , Signature ) <- AWSResource <- KMS
----
-
 local AwsService = require"api-gateway.aws.AwsService"
 local cjson = require"cjson"
 local error = error
 
-local _M = AwsService:new({ ___super = true })
+local _M = AwsService:new({___super = true})
+local super = {
+    instance = _M,
+    constructor = _M.constructor
+}
 
-function _M:new(o)
+function _M.new(self,o)
+    ngx.log(ngx.DEBUG, "KmsService() o=", tostring(o)  )
     local o = o or {}
     o.aws_service = "kms"
+
+    super.constructor(_M, o)
+
     setmetatable(o, self)
     self.__index = self
     return o
+end
+
+function _M:constructor(o)
+
 end
 
 -- API: http://docs.aws.amazon.com/kms/latest/APIReference/API_GenerateDataKey.html

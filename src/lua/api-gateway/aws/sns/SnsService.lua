@@ -11,10 +11,18 @@ local cjson = require"cjson"
 local error = error
 
 local _M = AwsService:new({ ___super = true })
+local super = {
+    instance = _M,
+    constructor = _M.constructor
+}
 
-function _M:new(o)
+function _M.new(self,o)
+    ngx.log(ngx.DEBUG, "SnsService() o=", tostring(o)  )
     local o = o or {}
     o.aws_service = "sns"
+
+    super.constructor(_M, o)
+
     setmetatable(o, self)
     self.__index = self
     return o

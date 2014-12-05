@@ -38,6 +38,8 @@ function AWSIAMCredentials:new(o)
         self.security_credentials_host = o.security_credentials_host or DEFAULT_SECURITY_CREDENTIALS_HOST
         self.security_credentials_port = o.security_credentials_port or DEFAULT_SECURITY_CREDENTIALS_PORT
         self.security_credentials_url = o.security_credentials_url or DEFAULT_SECURITY_CREDENTIALS_URL
+        ngx.log(ngx.DEBUG, "Initializing AWSIAMCredentials with host=", self.security_credentials_host,
+                    ", port=", self.security_credentials_port, ", url=", self.security_credentials_url )
     end
     return o
 end
@@ -64,6 +66,8 @@ end
 ---
 --  Auto discover the IAM User
 function AWSIAMCredentials:fetchIamUser()
+    ngx.log(ngx.DEBUG, "fetchIamUser(): Fetching IAM User from:",
+        self.security_credentials_host, ":", self.security_credentials_port, self.security_credentials_url)
     local hc1 = http:new()
 
     local ok, code, headers, status, body = hc1:request{
@@ -77,6 +81,7 @@ function AWSIAMCredentials:fetchIamUser()
 
     if (code == ngx.HTTP_OK and body ~= nil) then
         cache.IamUser = body
+        ngx.log(ngx.DEBUG, "fetchIamUser(): found user:" .. tostring(body) )
         return cache.IamUser
     end
     ngx.log(ngx.WARN, "Could not fetch iam user from:", self.security_credentials_host, ":", self.security_credentials_port, self.security_credentials_url)
@@ -115,8 +120,8 @@ function AWSIAMCredentials:fetchSecurityCredentialsFromAWS()
         -- set the values and the expiry time
         cache.AccessKeyId = aws_response["AccessKeyId"]
         cache.SecretAccessKey = aws_response["SecretAccessKey"]
-        local token = url:encodeUrl(aws_response["Token"])
-        cache.Token = token
+        --local token = url:encodeUrl(aws_response["Token"])
+        cache.Token = aws_response["Token"]
         cache.ExpireAt = aws_response["Expiration"]
         cache.ExpireAtTimestamp = getTimestamp(cache.ExpireAt, true)
         return true

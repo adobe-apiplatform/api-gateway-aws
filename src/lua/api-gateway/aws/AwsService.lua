@@ -14,9 +14,12 @@ local error = error
 local debug_mode = ngx.config.debug
 local http = require "api-gateway.aws.httpclient.http"
 local AWSV4S = require "api-gateway.aws.AwsV4Signature"
+local IamCredentials = require "api-gateway.aws.AWSIAMCredentials"
 local cjson = require"cjson"
 
 local http_client = http:new()
+local iam_credentials
+
 
 ---
 -- @param o object containing info about the AWS Service and Credentials or IAM User to use
@@ -28,13 +31,29 @@ local http_client = http:new()
 --
 -- NOTE: class inheirtance inspired from: http://www.lua.org/pil/16.2.html
 function _M:new(o)
+    ngx.log(ngx.DEBUG, "AwsService() supercls=", tostring(o.___super) )
+    ngx.log(ngx.DEBUG, "_M=", tostring(_M), ", self=", tostring(self))
+    ngx.log(ngx.DEBUG, "o=", tostring(o))
     local o = o or {}
     setmetatable(o, self)
     self.__index = self
     if not o.___super then
-        self:throwIfInitParamsInvalid(o)
+        self:constructor(o)
     end
+
     return o
+end
+
+function _M:constructor(o)
+    self:throwIfInitParamsInvalid(o)
+
+    if ( o.security_credentials_host ~= nil and o.security_credentials_port ~= nil ) then
+        ngx.log(ngx.DEBUG, "Initializing Iam with host=", tostring(o.security_credentials_host), ", port=", tostring(o.security_credentials_port) )
+        iam_credentials = IamCredentials:new({
+            security_credentials_host = o.security_credentials_host,
+            security_credentials_port = o.security_credentials_port
+        })
+    end
 end
 
 function _M:throwIfInitParamsInvalid(o)
@@ -42,18 +61,6 @@ function _M:throwIfInitParamsInvalid(o)
         error("Could not initialize. Missing init object. Please configure the AWS Service properly.")
     end
 
-    local iam_user = o.aws_iam_user or ""
-    local secret_key = o.aws_secret_key or ""
-    local access_key = o.aws_access_key or ""
-
-
-    if iam_user == "" and secret_key == "" and access_key == "" then
-        local s = ""
-        for k,v in pairs(o) do
-            s = s .. ", " .. k .. "=" .. v
-        end
-        error("Invalid credentials. At least aws_iam_user or (aws_secret_key,aws_access_key) need to be provided. Object is:" .. s)
-    end
 
     local service = o.aws_service or ""
     if service == "" then
@@ -80,13 +87,35 @@ function _M:getAWSHost()
     return self.aws_service .."." .. self.aws_region .. ".amazonaws.com"
 end
 
+function _M:getIamUserCredentials()
+     return iam_credentials:getSecurityCredentials()
+end
+
+function _M:getCredentials()
+    local secret = self.aws_secret_key or ""
+    local key = self.aws_access_key or ""
+    local token, date, timestamp
+
+    local return_obj = {
+        aws_secret_key = secret,
+        aws_access_key = key
+    }
+
+    if ( key == "" or secret == "" ) then
+        key,secret,token,date,timestamp = iam_credentials:getSecurityCredentials()
+        return_obj.token = token
+        return_obj.aws_secret_key = secret
+        return_obj.aws_access_key = key
+    end
+    ngx.log(ngx.DEBUG, "getCredentials():", return_obj.aws_access_key, " >> ", return_obj.aws_secret_key, " >> " , return_obj.token)
+    return return_obj
+end
+
 function _M:getAuthorizationHeader( http_method, path, uri_args, body )
-    local awsAuth =  AWSV4S:new({
-                       aws_region  = self.aws_region,
-                       aws_service = self.aws_service,
-                       aws_secret_key = self.aws_secret_key,
-                       aws_access_key = self.aws_access_key
-                  })
+    local credentials = self:getCredentials()
+    credentials.aws_region = self.aws_region
+    credentials.aws_service = self.aws_service
+    local awsAuth =  AWSV4S:new(credentials)
     local authorization = awsAuth:getAuthorizationHeader( http_method,
                                                         path, -- "/"
                                                         uri_args, -- ngx.req.get_uri_args()
@@ -126,6 +155,7 @@ end
 --
 function _M:performAction(actionName, arguments, path, http_method, useSSL, timeout )
     local host = self:getAWSHost()
+    local credentials = self:getCredentials()
     local request_method = http_method or "GET"
 
     local arguments = arguments or {}
@@ -157,7 +187,8 @@ function _M:performAction(actionName, arguments, path, http_method, useSSL, time
                     ["Accept"] = "application/json",
 --                    ["Content-Type"] = "application/x-www-form-urlencoded",
                     ["Content-Type"] = "application/x-amz-json-1.1",
-                    ["X-Amz-Target"] = t
+                    ["X-Amz-Target"] = t,
+                    ["x-amz-security-token"] = credentials.token
     }
 
     if request_method == "GET" then

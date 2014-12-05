@@ -13,6 +13,28 @@ plan tests => repeat_each() * (blocks() * 4) - 3;
 
 my $pwd = cwd();
 
+# try to read the nameservers used by the system resolver:
+my @nameservers;
+if (open my $in, "/etc/resolv.conf") {
+    while (<$in>) {
+        if (/^\s*nameserver\s+(\d+(?:\.\d+){3})(?:\s+|$)/) {
+            push @nameservers, $1;
+            if (@nameservers > 10) {
+                last;
+            }
+        }
+    }
+    close $in;
+}
+
+if (!@nameservers) {
+    # default to Google's open DNS servers
+    push @nameservers, "8.8.8.8", "8.8.4.4";
+}
+
+
+warn "Using nameservers: \n@nameservers\n";
+
 our $HttpConfig = <<_EOC_;
     # lua_package_path "$pwd/scripts/?.lua;;";
     lua_package_path 'src/lua/?.lua;;';
@@ -22,6 +44,7 @@ our $HttpConfig = <<_EOC_;
         v.on("$Test::Nginx::Util::ErrLogFile")
         require "resty.core"
     ';
+    resolver @nameservers;
 _EOC_
 
 #no_diff();
@@ -62,8 +85,6 @@ POST /test-signature?Subject=nginx:test!@$&TopicArn=arn:aws:sns:us-east-1:492299
             # set $aws_secret_key $TEST_NGINX_AWS_SECRET;
             set $aws_region us-east-1;
             set $aws_service sns;
-
-            resolver 10.8.4.247;
 
             content_by_lua '
 
