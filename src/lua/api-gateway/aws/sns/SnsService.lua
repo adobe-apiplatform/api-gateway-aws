@@ -34,9 +34,9 @@ function _M:listTopics()
     local ok, code, headers, status, body = self:performAction("ListTopics", arguments, "/", "GET", true)
 
     if (code == ngx.HTTP_OK and body ~= nil) then
-        return cjson.decode(body), status, body
+        return cjson.decode(body), code, headers, status, body
     end
-    return nil, status, body
+    return nil, code, headers, status, body
 end
 
 -- API: http://docs.aws.amazon.com/sns/latest/APIReference/API_Publish.html
@@ -51,9 +51,9 @@ function _M:publish(subject, message, topicArn, targetArn)
     local ok, code, headers, status, body = self:performAction("Publish", arguments, "/", "GET", true)
 
     if (code == ngx.HTTP_OK and body ~= nil) then
-        return cjson.decode(body), status, body
+        return cjson.decode(body), code, headers, status, body
     end
-    return nil, status, body
+    return nil, code, headers, status, body
 end
 
 return _M

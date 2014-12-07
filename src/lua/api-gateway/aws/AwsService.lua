@@ -136,7 +136,8 @@ function _M:getRequestArguments(actionName, parameters)
     local urlencoded_args = "Action=" .. actionName
     if parameters ~= nil then
         for key,value in pairs(parameters) do
-            urlencoded_args = urlencoded_args .. "&" .. key .. "=" .. (value or "")
+            local proper_val = ngx.re.gsub(value, "&", "%26", "ijo")
+            urlencoded_args = urlencoded_args .. "&" .. key .. "=" .. (proper_val or "")
         end
     end
     return urlencoded_args
@@ -167,7 +168,7 @@ function _M:performAction(actionName, arguments, path, http_method, useSSL, time
 
     if request_method ~= "GET" then
         uri_args = {}
-        request_body = cjson.encode(arguments) -- query_string
+        request_body = cjson.encode(arguments)
     end
 
     local scheme = "http"

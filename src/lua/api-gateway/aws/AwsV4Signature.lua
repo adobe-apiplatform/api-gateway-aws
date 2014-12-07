@@ -88,16 +88,23 @@ local function get_derived_signing_key(aws_secret_key, date, region, service )
 end
 
 local function urlEncode(inputString)
-        --[[if (inputString) then
+        if (inputString) then
             inputString = string.gsub (inputString, "\n", "\r\n")
             inputString = string.gsub (inputString, "([^%w %-%_%.%~])",
                 function (c) return string.format ("%%%02X", string.byte(c)) end)
-            inputString = string.gsub (inputString, " ", "+")
-        end]]
-        local s = ngx.escape_uri(inputString)
+            inputString = ngx.re.gsub (inputString, " ", "+", "ijo")
+            -- AWS workarounds
+            -- replace '+' ( %2B ) with ( %20 )
+            inputString = ngx.re.gsub(inputString, "%2B", "%20", "ijo")
+
+        end
+        return inputString
+        --[[local s = ngx.escape_uri(inputString)
         -- replace '+' ( %2B ) with ( %20 )
         s = ngx.re.gsub(s, "%2B", "%20", "ijo")
-        return s
+        -- replace "," with %2C
+        s = ngx.re.gsub(s, ",", "%2C", "ijo")
+        return s]]
 end
 
 local function getTableIterator(uri_args, urlParameterKeys)
