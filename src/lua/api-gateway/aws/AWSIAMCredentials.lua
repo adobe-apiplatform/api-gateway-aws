@@ -14,7 +14,7 @@ local DEFAULT_SECURITY_CREDENTIALS_HOST = "169.254.169.254"
 local DEFAULT_SECURITY_CREDENTIALS_PORT = "80"
 local DEFAULT_SECURITY_CREDENTIALS_URL = "/latest/meta-data/iam/security-credentials/"
 -- use GET /latest/meta-data/iam/security-credentials/ to auto-discover the IAM Role
-local DEFAULT_TOKEN_EXPIRATION = 3600 -- in seconds
+local DEFAULT_TOKEN_EXPIRATION = 60*60*24 -- in seconds
 
 -- per nginx process cache to store IAM credentials
 local cache = {
@@ -26,8 +26,19 @@ local cache = {
     ExpireAtTimestamp = nil
 }
 
+local sharedCacheDictInstance
+
 local AWSIAMCredentials = {}
 
+---
+-- @param o Configuration object
+-- o.iam_user                       -- optional. iam_user. if not defined it'll be auto-discovered
+-- o.security_credentials_timeout   -- optional. specifies when the token should expire. Defaults to 24 hours
+-- o.security_credentials_host      -- optional. AWS Host to read credentials from. Defaults to "169.254.169.254"
+-- o.security_credentials_port      -- optional. AWS Port to read credentials. Defaults to 80.
+-- o.security_credentials_url       -- optional. AWS URI to read credentials. Defaults to "/latest/meta-data/iam/security-credentials/"
+-- o.shared_cache_dict              -- optional. For performance improvements the credentials may be stored in a share dict.
+--
 function AWSIAMCredentials:new(o)
     o = o or {}
     setmetatable(o, self)
@@ -38,8 +49,13 @@ function AWSIAMCredentials:new(o)
         self.security_credentials_host = o.security_credentials_host or DEFAULT_SECURITY_CREDENTIALS_HOST
         self.security_credentials_port = o.security_credentials_port or DEFAULT_SECURITY_CREDENTIALS_PORT
         self.security_credentials_url = o.security_credentials_url or DEFAULT_SECURITY_CREDENTIALS_URL
-        ngx.log(ngx.DEBUG, "Initializing AWSIAMCredentials with host=", self.security_credentials_host,
-                    ", port=", self.security_credentials_port, ", url=", self.security_credentials_url )
+        self.shared_cache_dict = o.shared_cache_dict
+        if (o.shared_cache_dict ~= nil) then
+            sharedCacheDictInstance = ngx.shared[o.shared_cache_dict]
+        end
+        ngx.log(ngx.DEBUG, "Initializing AWSIAMCredentials with host=", tostring(self.security_credentials_host),
+            ", port=", tostring(self.security_credentials_port), ", url=", tostring(self.security_credentials_url),
+            ", shared_cache_dict=", tostring(self.shared_cache_dict))
     end
     return o
 end
@@ -48,6 +64,8 @@ local function getTimestamp(dateString, convertToUTC)
     local pattern = "(%d+)%-(%d+)%-(%d+)T(%d+):(%d+):(%d+)Z"
     local xyear, xmonth, xday, xhour, xminute,
     xseconds, xoffset, xoffsethour, xoffsetmin = dateString:match(pattern)
+
+    -- the converted timestamp is in the local timezone
     local convertedTimestamp = os.time({
         year = xyear,
         month = xmonth,
@@ -63,10 +81,50 @@ local function getTimestamp(dateString, convertToUTC)
     return tonumber(convertedTimestamp)
 end
 
+function AWSIAMCredentials:saveCredentialsInSharedDict()
+    if (sharedCacheDictInstance == nil) then
+        ngx.log(ngx.WARN, "No shared_cache_dict provided to AWSIAMCredentials. To improve performance please define one.")
+        return
+    end
+
+    local expiry_time_utc = getTimestamp(cache.ExpireAt, true)
+    local expire_in_sec = expiry_time_utc - os.time()
+    if ( expire_in_sec > 0 ) then
+        -- set the values and the expiry time
+        sharedCacheDictInstance:set("AccessKeyId", cache.AccessKeyId, expire_in_sec)
+        sharedCacheDictInstance:set("SecretAccessKey", cache.SecretAccessKey, expire_in_sec)
+        sharedCacheDictInstance:set("Token", cache.Token, expire_in_sec)
+        sharedCacheDictInstance:set("ExpireAt", cache.ExpireAt, expire_in_sec)
+        sharedCacheDictInstance:set("ExpireAtTimestamp", cache.ExpireAtTimestamp, expire_in_sec)
+
+        ngx.log(ngx.DEBUG, "IAM Credentials cached for ", tostring(expire_in_sec), " seconds in the shared dict=", self.shared_cache_dict)
+    end
+end
+
+function AWSIAMCredentials:loadCredentialsFromSharedDict()
+    if (sharedCacheDictInstance == nil) then
+        ngx.log(ngx.WARN, "No shared_cache_dict provided to AWSIAMCredentials. To improve performance please define one.")
+        return
+    end
+    -- see if there's something in the shared dict that didn't expire yet
+    local accessKeyId = sharedCacheDictInstance:get("AccessKeyId")
+    if ( accessKeyId == nil ) then
+        ngx.log(ngx.DEBUG, "nothing found in Shared Cache")
+        return
+    end
+
+    cache.AccessKeyId = sharedCacheDictInstance:get("AccessKeyId")
+    cache.SecretAccessKey = sharedCacheDictInstance:get("SecretAccessKey")
+    cache.Token = sharedCacheDictInstance:get("Token")
+    cache.ExpireAt = sharedCacheDictInstance:get("ExpireAt")
+    cache.ExpireAtTimestamp = sharedCacheDictInstance:get("ExpireAtTimestamp")
+    ngx.log(ngx.DEBUG, "Cache has been loaded from Shared Cache" )
+end
+
 ---
---  Auto discover the IAM User
+-- Auto discover the IAM User
 function AWSIAMCredentials:fetchIamUser()
-    ngx.log(ngx.DEBUG, "fetchIamUser(): Fetching IAM User from:",
+    ngx.log(ngx.DEBUG, "Fetching IAM User from:",
         self.security_credentials_host, ":", self.security_credentials_port, self.security_credentials_url)
     local hc1 = http:new()
 
@@ -81,7 +139,7 @@ function AWSIAMCredentials:fetchIamUser()
 
     if (code == ngx.HTTP_OK and body ~= nil) then
         cache.IamUser = body
-        ngx.log(ngx.DEBUG, "fetchIamUser(): found user:" .. tostring(body) )
+        ngx.log(ngx.DEBUG, "found user:" .. tostring(body))
         return cache.IamUser
     end
     ngx.log(ngx.WARN, "Could not fetch iam user from:", self.security_credentials_host, ":", self.security_credentials_port, self.security_credentials_url)
@@ -90,14 +148,15 @@ end
 
 function AWSIAMCredentials:getIamUser()
     local cachedIamUser = self.iam_user or cache.IamUser
-    if ( cachedIamUser ~= nil ) then
+    if (cachedIamUser ~= nil) then
         return cachedIamUser, true
     end
+    ngx.log(ngx.WARN, "No iam_user provided. To improve performance please define one to avoid extra round trips to AWS")
     return self:fetchIamUser(), false
 end
 
 ---
---  Get credentials for the IAM User
+-- Get credentials for the IAM User
 function AWSIAMCredentials:fetchSecurityCredentialsFromAWS()
     local iamURL = self.security_credentials_url .. self:getIamUser() .. "?DurationSeconds=" .. self.security_credentials_timeout
 
@@ -112,7 +171,7 @@ function AWSIAMCredentials:fetchSecurityCredentialsFromAWS()
         poolsize = 50
     }
 
-    ngx.log(ngx.DEBUG, "fetchSecurityCredentialsFromAWS() AWS Response:" .. tostring(body))
+    ngx.log(ngx.DEBUG, "AWS Response:" .. tostring(body))
 
     local aws_response = cjson.decode(body)
 
@@ -124,6 +183,7 @@ function AWSIAMCredentials:fetchSecurityCredentialsFromAWS()
         cache.Token = aws_response["Token"]
         cache.ExpireAt = aws_response["Expiration"]
         cache.ExpireAtTimestamp = getTimestamp(cache.ExpireAt, true)
+        self:saveCredentialsInSharedDict()
         return true
     end
 
@@ -132,8 +192,9 @@ function AWSIAMCredentials:fetchSecurityCredentialsFromAWS()
 end
 
 function AWSIAMCredentials:getSecurityCredentials()
-    if ( cache.Token == nil or cache.SecretAccessKey == nil or cache.AccessKeyId == nil) then
-        ngx.log(ngx.DEBUG, "getSecurityCredentials(): Obtaining a new token as the cache is empty." )
+    self:loadCredentialsFromSharedDict()
+    if (cache.Token == nil or cache.SecretAccessKey == nil or cache.AccessKeyId == nil) then
+        ngx.log(ngx.DEBUG, "Obtaining a new token as the cache is empty.")
         self:fetchSecurityCredentialsFromAWS()
     end
 
@@ -141,8 +202,8 @@ function AWSIAMCredentials:getSecurityCredentials()
     local now_in_secs = ngx.time()
     local expireAtTimestamp = cache.ExpireAtTimestamp or now_in_secs
 
-    if (now_in_secs >= expireAtTimestamp ) then
-        ngx.log(ngx.DEBUG, "getSecurityCredentials(): Current token expired " .. tostring(expireAtTimestamp-now_in_secs) .. " seconds ago. Obtaining a new token." )
+    if (now_in_secs >= expireAtTimestamp) then
+        ngx.log(ngx.WARN, "Current token expired " .. tostring(expireAtTimestamp - now_in_secs) .. " seconds ago. Obtaining a new token.")
         self:fetchSecurityCredentialsFromAWS()
     end
 
