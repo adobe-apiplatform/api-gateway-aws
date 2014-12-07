@@ -65,9 +65,9 @@ function _M:generateDataKey(keyId, keySpec, numberOfBytes, encryptionContext, gr
     local ok, code, headers, status, body = self:performAction("GenerateDataKey", arguments, "/", "POST", true, 60000)
 
     if (code == ngx.HTTP_OK and body ~= nil) then
-        return cjson.decode(body), status, body
+        return cjson.decode(body), code, headers, status, body
     end
-    return nil, status, body
+    return nil, code, headers, status, body
 end
 
 -- API: http://docs.aws.amazon.com/kms/latest/APIReference/API_Decrypt.html
@@ -93,9 +93,9 @@ function _M:decrypt(cipherText, encryptionContext, grantTokens)
     local ok, code, headers, status, body = self:performAction("Decrypt", arguments, "/", "POST", true, 60000)
 
     if (code == ngx.HTTP_OK and body ~= nil) then
-        return cjson.decode(body), status, body
+        return cjson.decode(body), code, headers, status, body
     end
-    return nil, status, body
+    return nil, code, headers, status, body
 end
 
 -- API: http://docs.aws.amazon.com/kms/latest/APIReference/API_Encrypt.html
@@ -123,9 +123,9 @@ function _M:encrypt(keyId, plaintext, encryptionContext, grantTokens)
     local ok, code, headers, status, body = self:performAction("Encrypt", arguments, "/", "POST", true, 60000)
 
     if (code == ngx.HTTP_OK and body ~= nil) then
-        return cjson.decode(body), status, body
+        return cjson.decode(body), code, headers, status, body
     end
-    return nil, status, body
+    return nil, code, headers, status, body
 end
 
 -- API: http://docs.aws.amazon.com/kms/latest/APIReference/API_ListAliases.html
@@ -141,9 +141,9 @@ function _M:listAliases(limit, marker)
     local ok, code, headers, status, body = self:performAction("ListAliases", arguments, "/", "POST", true, 60000)
 
     if (code == ngx.HTTP_OK and body ~= nil) then
-        return cjson.decode(body), status, body
+        return cjson.decode(body), code, headers, status, body
     end
-    return nil, status, body
+    return nil, code, headers, status, body
 end
 
 return _M
