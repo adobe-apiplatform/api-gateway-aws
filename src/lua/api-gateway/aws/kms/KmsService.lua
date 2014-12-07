@@ -29,7 +29,7 @@ function _M.new(self,o)
 end
 
 function _M:constructor(o)
-
+    ngx.log(ngx.DEBUG, "KmsService() constructor " )
 end
 
 -- API: http://docs.aws.amazon.com/kms/latest/APIReference/API_GenerateDataKey.html

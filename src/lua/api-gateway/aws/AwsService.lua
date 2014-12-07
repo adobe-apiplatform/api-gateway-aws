@@ -30,6 +30,7 @@ local iam_credentials
 --     o.aws_iam_user    - optional. if aws_secret_key,aws_access_key pair is missing you can provide an iam_user
 --     o.security_credentials_host - optional. the AWS URL to read security credentials from and figure out the iam_user
 --     o.security_credentials_port - optional. the port used when connecting to security_credentials_host
+--     o.shared_cache_dict - optional. AWSIAMCredentials uses it to store IAM Credentials.
 --
 -- NOTE: class inheirtance inspired from: http://www.lua.org/pil/16.2.html
 function _M:new(o)
@@ -45,11 +46,19 @@ function _M:new(o)
 end
 
 function _M:constructor(o)
+    ngx.log(ngx.DEBUG, "AwsService() constructor " )
+    local s = ""
+    for k,v in pairs(o) do
+        s = s .. ", " .. k .. "=" .. tostring(v)
+    end
+    ngx.log(ngx.DEBUG, "init object=" .. s)
     self:throwIfInitParamsInvalid(o)
 
     if ( o.security_credentials_host ~= nil and o.security_credentials_port ~= nil ) then
         ngx.log(ngx.DEBUG, "Initializing Iam with host=", tostring(o.security_credentials_host), ", port=", tostring(o.security_credentials_port) )
         iam_credentials = IamCredentials:new({
+            shared_cache_dict = o.shared_cache_dict,
+            iam_user = o.aws_iam_user,
             security_credentials_host = o.security_credentials_host,
             security_credentials_port = o.security_credentials_port
         })
@@ -201,7 +210,7 @@ function _M:performAction(actionName, arguments, path, http_method, useSSL, time
         ngx.log(ngx.WARN, "Calling AWS:", request_method, " ", scheme, "://", host, ":", port, "/", request_path, ". Body=",  request_body)
         local s = ""
         for k,v in pairs(request_headers) do
-            s = s .. ", " .. k .. "=" .. v
+            s = s .. ", " .. k .. "=" .. tostring(v)
         end
         ngx.log(ngx.WARN, "Calling AWS with Headers:", s )
     end
@@ -222,7 +231,7 @@ function _M:performAction(actionName, arguments, path, http_method, useSSL, time
     if (self.aws_debug == true ) then
         local s = ""
         for k,v in pairs(headers) do
-            s = s .. ", " .. k .. "=" .. v
+            s = s .. ", " .. k .. "=" .. tostring(v)
         end
         ngx.log(ngx.WARN, "AWS Response:", "code=", code, ", headers=", s, ", status=", status, ", body=", body)
     end
