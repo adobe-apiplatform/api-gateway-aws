@@ -20,6 +20,14 @@ local cjson = require"cjson"
 local http_client = http:new()
 local iam_credentials
 
+local function tableToString(table_ref)
+    local s = ""
+    local o = table_ref or {}
+    for k,v in pairs(o) do
+        s = s .. ", " .. k .. "=" .. tostring(v)
+    end
+    return s
+end
 
 ---
 -- @param o object containing info about the AWS Service and Credentials or IAM User to use
@@ -47,15 +55,16 @@ end
 
 function _M:constructor(o)
     ngx.log(ngx.DEBUG, "AwsService() constructor " )
-    local s = ""
-    for k,v in pairs(o) do
-        s = s .. ", " .. k .. "=" .. tostring(v)
-    end
+    local s = tableToString(o)
     ngx.log(ngx.DEBUG, "init object=" .. s)
     self:throwIfInitParamsInvalid(o)
 
-    if ( o.security_credentials_host ~= nil and o.security_credentials_port ~= nil ) then
-        ngx.log(ngx.DEBUG, "Initializing Iam with host=", tostring(o.security_credentials_host), ", port=", tostring(o.security_credentials_port) )
+    local secret = self.aws_secret_key or ""
+    local key = self.aws_access_key or ""
+
+    -- if accessKey or secret is not provided then try with Iam User
+    if ( key == "" or secret == "" ) then
+        ngx.log(ngx.DEBUG, "Initializing IamCredentials as aws_secret_key,aws_access_key were not valid: [" , secret, ",",  key, "]" )
         iam_credentials = IamCredentials:new({
             shared_cache_dict = o.shared_cache_dict,
             iam_user = o.aws_iam_user,
@@ -212,11 +221,8 @@ function _M:performAction(actionName, arguments, path, http_method, useSSL, time
 
     if ( self.aws_debug == true ) then
         ngx.log(ngx.WARN, "Calling AWS:", request_method, " ", scheme, "://", host, ":", port, "/", request_path, ". Body=",  request_body)
-        local s = ""
-        for k,v in pairs(request_headers) do
-            s = s .. ", " .. k .. "=" .. tostring(v)
-        end
-        ngx.log(ngx.WARN, "Calling AWS with Headers:", s )
+        local s = tableToString(request_headers)
+        ngx.log(ngx.DEBUG, "Calling AWS: Headers:", s )
     end
 
     local ok, code, headers, status, body  = self:getHttpClient():request( self:getRequestObject({
@@ -233,12 +239,8 @@ function _M:performAction(actionName, arguments, path, http_method, useSSL, time
     }) )
 
     if (self.aws_debug == true ) then
-        local s = ""
-        headers = headers or {}
-        for k,v in pairs(headers) do
-            s = s .. ", " .. k .. "=" .. tostring(v)
-        end
-        ngx.log(ngx.WARN, "AWS Response:", "code=", code, ", headers=", s, ", status=", status, ", body=", body)
+        local s = tableToString(headers)
+        ngx.log(ngx.DEBUG, "AWS Response:", "code=", code, ", headers=", s, ", status=", status, ", body=", body)
     end
 
     return ok, code, headers, status, body

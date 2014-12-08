@@ -28,6 +28,15 @@ local cache = {
 
 local sharedCacheDictInstance
 
+local function tableToString(table_ref)
+    local s = ""
+    local o = table_ref or {}
+    for k,v in pairs(o) do
+        s = s .. ", " .. k .. "=" .. tostring(v)
+    end
+    return s
+end
+
 local AWSIAMCredentials = {}
 
 ---
@@ -53,9 +62,8 @@ function AWSIAMCredentials:new(o)
         if (o.shared_cache_dict ~= nil) then
             sharedCacheDictInstance = ngx.shared[o.shared_cache_dict]
         end
-        ngx.log(ngx.DEBUG, "Initializing AWSIAMCredentials with host=", tostring(self.security_credentials_host),
-            ", port=", tostring(self.security_credentials_port), ", url=", tostring(self.security_credentials_url),
-            ", shared_cache_dict=", tostring(self.shared_cache_dict))
+        local s = tableToString(o)
+        ngx.log(ngx.DEBUG, "Initializing AWSIAMCredentials with object:", s)
     end
     return o
 end

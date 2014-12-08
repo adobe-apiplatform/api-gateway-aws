@@ -126,7 +126,8 @@ The other libraries such as `Redis`, `test-nginx` are located in `test/resources
 Other files used when running the test are also located in `test/resources`.
 
 To execute the test issue the following command:
- ```
+
+ ```bash
  TEST_NGINX_AWS_CLIENT_ID="--change--me" TEST_NGINX_AWS_SECRET="--change-me--" make test
  ```
 
