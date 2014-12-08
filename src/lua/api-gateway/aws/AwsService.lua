@@ -111,6 +111,10 @@ function _M:getCredentials()
     }
 
     if ( key == "" or secret == "" ) then
+        if ( iam_credentials == nil ) then
+            ngx.log(ngx.WARN, "Could not discover IAM User. Please provide aws_access_key and aws_secret_key")
+            return return_obj
+        end
         key,secret,token,date,timestamp = iam_credentials:getSecurityCredentials()
         return_obj.token = token
         return_obj.aws_secret_key = secret
