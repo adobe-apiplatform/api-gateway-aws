@@ -220,7 +220,7 @@ function _M:performAction(actionName, arguments, path, http_method, useSSL, time
     end
 
     if ( self.aws_debug == true ) then
-        ngx.log(ngx.WARN, "Calling AWS:", request_method, " ", scheme, "://", host, ":", port, "/", request_path, ". Body=",  request_body)
+        ngx.log(ngx.DEBUG, "Calling AWS:", request_method, " ", scheme, "://", host, ":", port, "/", request_path, ". Body=",  request_body)
         local s = tableToString(request_headers)
         ngx.log(ngx.DEBUG, "Calling AWS: Headers:", s )
     end
