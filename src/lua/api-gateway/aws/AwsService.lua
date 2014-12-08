@@ -234,6 +234,7 @@ function _M:performAction(actionName, arguments, path, http_method, useSSL, time
 
     if (self.aws_debug == true ) then
         local s = ""
+        headers = headers or {}
         for k,v in pairs(headers) do
             s = s .. ", " .. k .. "=" .. tostring(v)
         end
