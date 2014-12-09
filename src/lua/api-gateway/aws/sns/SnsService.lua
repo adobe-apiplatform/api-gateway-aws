@@ -16,8 +16,8 @@ local super = {
     constructor = _M.constructor
 }
 
-function _M.new(self,o)
-    ngx.log(ngx.DEBUG, "SnsService() o=", tostring(o)  )
+function _M.new(self, o)
+    ngx.log(ngx.DEBUG, "SnsService() o=", tostring(o))
     local o = o or {}
     o.aws_service = "sns"
 
@@ -45,10 +45,12 @@ function _M:publish(subject, message, topicArn, targetArn)
     local arguments = {
         Message = message,
         Subject = subject,
-        TargetArn = targetArn,
-        TopicArn = topicArn
+        TopicArn = topicArn,
+        TargetArn = targetArn
     }
-    local ok, code, headers, status, body = self:performAction("Publish", arguments, "/", "GET", true)
+
+    local timeout = 60000
+    local ok, code, headers, status, body = self:performAction("Publish", arguments, "/", "POST", true, timeout, "application/x-www-form-urlencoded")
 
     if (code == ngx.HTTP_OK and body ~= nil) then
         return cjson.decode(body), code, headers, status, body

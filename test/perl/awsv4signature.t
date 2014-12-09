@@ -106,23 +106,25 @@ POST /test-signature?Subject=nginx:test!@$&TopicArn=arn:aws:sns:us-east-1:492299
                 requestbody = requestbody .. "&Message=" .. msg
 
                 local authorization = awsAuth:getAuthorizationHeader( ngx.var.request_method,
-                                                                    "/test-signature",
+                                                                    "/",
                                                                     {}, -- ngx.req.get_uri_args()
                                                                     requestbody)
 
-                local http = require "api-gateway.logger.http"
+                local http = require "api-gateway.aws.httpclient.http"
                 local hc = http:new()
 
 
                 local ok, code, headers, status, body  = hc:request {
-                        url = "/test-signature", -- .. "?" .. ngx.var.args,
+                        url = "/", -- .. "?" .. ngx.var.args,
                         host = host,
                         body = requestbody,
                         method = ngx.var.request_method,
                         headers = {
                                     Authorization = authorization,
                                     ["X-Amz-Date"] = awsAuth.aws_date,
-                                    ["Content-Type"] = "application/x-www-form-urlencoded"
+                                    ["Content-Type"] = "application/x-www-form-urlencoded",
+                                    ["Accept"] = "application/json",
+                                    ["X-Amz-Target"] = "TrentService.Publish"
                                 }
                 }
                 ngx.say(ok)
@@ -152,8 +154,6 @@ POST /test-signature?Action=Publish&Message=POST-cosocket-is-awesome&Subject=ngi
             set $aws_region us-east-1;
             set $aws_service sns;
 
-            resolver 10.8.4.247;
-
             content_by_lua '
 
                 local host = ngx.var.aws_service .."." .. ngx.var.aws_region .. ".amazonaws.com"
@@ -175,7 +175,7 @@ POST /test-signature?Action=Publish&Message=POST-cosocket-is-awesome&Subject=ngi
 
                 local requestbody = awsAuth:formatQueryString(ngx.req.get_uri_args())
 
-                local http = require "api-gateway.logger.http"
+                local http = require "api-gateway.aws.httpclient.http"
                 local hc = http:new()
 
 
@@ -195,10 +195,11 @@ POST /test-signature?Action=Publish&Message=POST-cosocket-is-awesome&Subject=ngi
                 ngx.say(body)
             ';
         }
+--- timeout: 20s
 --- more_headers
 X-Test: test
 --- request
-GET /test-signature?Action=Publish&Message=POST-cosocket-is-awesome&Subject=nginx-with-cosocket-and-uri-args&TopicArn=arn:aws:sns:us-east-1:492299007544:apiplatform-dev-ue1-topic-analytics
+POST /test-signature?Action=Publish&Message=POST-cosocket-is-awesome&Subject=nginx-with-cosocket-and-uri-args&TopicArn=arn:aws:sns:us-east-1:492299007544:apiplatform-dev-ue1-topic-analytics
 --- response_body_like eval
 [".*PublishResult.*ResponseMetadata.*"]
 --- error_code: 200

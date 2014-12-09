@@ -86,12 +86,11 @@ __DATA__
                 ngx.say("TopicARN:" .. tostring(topicArn))
 
                 local response = service:publish("test-subject","test-message-from-openresty-unit-test", topicArn)
+                assert(response ~= nil, "Publish response should not be null")
                 local messageId = response.PublishResponse.PublishResult.MessageId
                 ngx.say("Message_ID:" .. tostring(messageId))
             ';
         }
---- more_headers
-X-Test: test
 --- request
 GET /test
 --- response_body_like eval
@@ -99,6 +98,8 @@ GET /test
 --- error_code: 200
 --- no_error_log
 [error]
+--- more_headers
+X-Test: test
 
 
 === TEST 2: test SNS with special chars in message

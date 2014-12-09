@@ -1,5 +1,5 @@
 --- Base Class for working with AWS Services.
---  It's responsible for making API Requests to most of the AWS Services
+-- It's responsible for making API Requests to most of the AWS Services
 --
 -- Created by IntelliJ IDEA.
 -- User: ddascal
@@ -12,9 +12,9 @@ local _M = { _VERSION = '0.01' }
 local setmetatable = setmetatable
 local error = error
 local debug_mode = ngx.config.debug
-local http = require "api-gateway.aws.httpclient.http"
-local AWSV4S = require "api-gateway.aws.AwsV4Signature"
-local IamCredentials = require "api-gateway.aws.AWSIAMCredentials"
+local http = require"api-gateway.aws.httpclient.http"
+local AWSV4S = require"api-gateway.aws.AwsV4Signature"
+local IamCredentials = require"api-gateway.aws.AWSIAMCredentials"
 local cjson = require"cjson"
 
 local http_client = http:new()
@@ -23,7 +23,7 @@ local iam_credentials
 local function tableToString(table_ref)
     local s = ""
     local o = table_ref or {}
-    for k,v in pairs(o) do
+    for k, v in pairs(o) do
         s = s .. ", " .. k .. "=" .. tostring(v)
     end
     return s
@@ -31,18 +31,18 @@ end
 
 ---
 -- @param o object containing info about the AWS Service and Credentials or IAM User to use
---     o.aws_region      - AWS Region
---     o.aws_service     - the AWS Service to call
---     o.aws_secret_key  - AWS Credential
---     o.aws_access_key  - AWS Credential
---     o.aws_iam_user    - optional. if aws_secret_key,aws_access_key pair is missing you can provide an iam_user
---     o.security_credentials_host - optional. the AWS URL to read security credentials from and figure out the iam_user
---     o.security_credentials_port - optional. the port used when connecting to security_credentials_host
---     o.shared_cache_dict - optional. AWSIAMCredentials uses it to store IAM Credentials.
+-- o.aws_region      - AWS Region
+-- o.aws_service     - the AWS Service to call
+-- o.aws_secret_key  - AWS Credential
+-- o.aws_access_key  - AWS Credential
+-- o.aws_iam_user    - optional. if aws_secret_key,aws_access_key pair is missing you can provide an iam_user
+-- o.security_credentials_host - optional. the AWS URL to read security credentials from and figure out the iam_user
+-- o.security_credentials_port - optional. the port used when connecting to security_credentials_host
+-- o.shared_cache_dict - optional. AWSIAMCredentials uses it to store IAM Credentials.
 --
 -- NOTE: class inheirtance inspired from: http://www.lua.org/pil/16.2.html
 function _M:new(o)
-    ngx.log(ngx.DEBUG, "AwsService() supercls=", tostring(o.___super) )
+    ngx.log(ngx.DEBUG, "AwsService() supercls=", tostring(o.___super))
     local o = o or {}
     setmetatable(o, self)
     self.__index = self
@@ -54,7 +54,7 @@ function _M:new(o)
 end
 
 function _M:constructor(o)
-    ngx.log(ngx.DEBUG, "AwsService() constructor " )
+    ngx.log(ngx.DEBUG, "AwsService() constructor ")
     local s = tableToString(o)
     ngx.log(ngx.DEBUG, "init object=" .. s)
     self:throwIfInitParamsInvalid(o)
@@ -63,8 +63,8 @@ function _M:constructor(o)
     local key = self.aws_access_key or ""
 
     -- if accessKey or secret is not provided then try with Iam User
-    if ( key == "" or secret == "" ) then
-        ngx.log(ngx.DEBUG, "Initializing IamCredentials as aws_secret_key,aws_access_key were not valid: [" , secret, ",",  key, "]" )
+    if (key == "" or secret == "") then
+        ngx.log(ngx.DEBUG, "Initializing IamCredentials as aws_secret_key,aws_access_key were not valid: [", secret, ",", key, "]")
         iam_credentials = IamCredentials:new({
             shared_cache_dict = o.shared_cache_dict,
             iam_user = o.aws_iam_user,
@@ -75,7 +75,7 @@ function _M:constructor(o)
 end
 
 function _M:throwIfInitParamsInvalid(o)
-    if (o == nil ) then
+    if (o == nil) then
         error("Could not initialize. Missing init object. Please configure the AWS Service properly.")
     end
 
@@ -102,11 +102,11 @@ function _M:getHttpClient()
 end
 
 function _M:getAWSHost()
-    return self.aws_service .."." .. self.aws_region .. ".amazonaws.com"
+    return self.aws_service .. "." .. self.aws_region .. ".amazonaws.com"
 end
 
 function _M:getIamUserCredentials()
-     return iam_credentials:getSecurityCredentials()
+    return iam_credentials:getSecurityCredentials()
 end
 
 function _M:getCredentials()
@@ -119,29 +119,29 @@ function _M:getCredentials()
         aws_access_key = key
     }
 
-    if ( key == "" or secret == "" ) then
-        if ( iam_credentials == nil ) then
+    if (key == "" or secret == "") then
+        if (iam_credentials == nil) then
             ngx.log(ngx.WARN, "Could not discover IAM User. Please provide aws_access_key and aws_secret_key")
             return return_obj
         end
-        key,secret,token,date,timestamp = iam_credentials:getSecurityCredentials()
+        key, secret, token, date, timestamp = iam_credentials:getSecurityCredentials()
         return_obj.token = token
         return_obj.aws_secret_key = secret
         return_obj.aws_access_key = key
     end
-    ngx.log(ngx.DEBUG, "getCredentials():", return_obj.aws_access_key, " >> ", return_obj.aws_secret_key, " >> " , return_obj.token)
+    ngx.log(ngx.DEBUG, "getCredentials():", return_obj.aws_access_key, " >> ", return_obj.aws_secret_key, " >> ", return_obj.token)
     return return_obj
 end
 
-function _M:getAuthorizationHeader( http_method, path, uri_args, body )
+function _M:getAuthorizationHeader(http_method, path, uri_args, body)
     local credentials = self:getCredentials()
     credentials.aws_region = self.aws_region
     credentials.aws_service = self.aws_service
-    local awsAuth =  AWSV4S:new(credentials)
-    local authorization = awsAuth:getAuthorizationHeader( http_method,
-                                                        path, -- "/"
-                                                        uri_args, -- ngx.req.get_uri_args()
-                                                        body )
+    local awsAuth = AWSV4S:new(credentials)
+    local authorization = awsAuth:getAuthorizationHeader(http_method,
+        path, -- "/"
+        uri_args, -- ngx.req.get_uri_args()
+        body)
     return authorization, awsAuth
 end
 
@@ -150,14 +150,14 @@ end
 -- By default it returns the same object
 -- @param object request object
 --
-function _M:getRequestObject( object )
+function _M:getRequestObject(object)
     return object
 end
 
 function _M:getRequestArguments(actionName, parameters)
     local urlencoded_args = "Action=" .. actionName
     if parameters ~= nil then
-        for key,value in pairs(parameters) do
+        for key, value in pairs(parameters) do
             local proper_val = ngx.re.gsub(value, "&", "%26", "ijo")
             urlencoded_args = urlencoded_args .. "&" .. key .. "=" .. (proper_val or "")
         end
@@ -175,22 +175,31 @@ end
 -- @param path AWS Path. Default value is "/"
 -- @param http_method Request HTTP Method. Default value is "GET"
 -- @param useSSL Call using HTTPS or HTTP. Default value is "HTTP"
+-- @param contentType Specifies how to deliver the content to the AWS Service.
+--         Possible values are:   "application/x-amz-json-1.1" or "application/x-www-form-urlencoded"
 --
-function _M:performAction(actionName, arguments, path, http_method, useSSL, timeout )
+function _M:performAction(actionName, arguments, path, http_method, useSSL, timeout, contentType)
     local host = self:getAWSHost()
     local credentials = self:getCredentials()
     local request_method = http_method or "GET"
 
     local arguments = arguments or {}
-    local query_string = self:getRequestArguments(actionName, arguments )
+    local query_string = self:getRequestArguments(actionName, arguments)
     local request_path = path or "/"
 
     local uri_args, request_body = arguments, ""
     uri_args.Action = actionName
 
+    local content_type = contentType or "application/x-amz-json-1.1"
+
+    if content_type == "application/x-amz-json-1.1" then
+        request_body = cjson.encode(arguments)
+    elseif content_type == "application/x-www-form-urlencoded" then
+        request_body = query_string
+    end
+
     if request_method ~= "GET" then
         uri_args = {}
-        request_body = cjson.encode(arguments)
     end
 
     local scheme = "http"
@@ -205,40 +214,39 @@ function _M:performAction(actionName, arguments, path, http_method, useSSL, time
 
     local t = "TrentService." .. actionName
     local request_headers = {
-                    Authorization = authorization,
-                    ["X-Amz-Date"] = awsAuth.aws_date,
-                    ["Accept"] = "application/json",
---                    ["Content-Type"] = "application/x-www-form-urlencoded",
-                    ["Content-Type"] = "application/x-amz-json-1.1",
-                    ["X-Amz-Target"] = t,
-                    ["x-amz-security-token"] = credentials.token
+        Authorization = authorization,
+        ["X-Amz-Date"] = awsAuth.aws_date,
+        ["Accept"] = "application/json",
+        ["Content-Type"] = content_type,
+        ["X-Amz-Target"] = t,
+        ["x-amz-security-token"] = credentials.token
     }
 
+    -- this race condition has to be AFTER the authorization header has been calculated
     if request_method == "GET" then
-        request_headers["Content-Type"] = "text/plain"
         request_path = request_path .. "?" .. query_string
     end
 
-    if ( self.aws_debug == true ) then
-        ngx.log(ngx.DEBUG, "Calling AWS:", request_method, " ", scheme, "://", host, ":", port, "/", request_path, ". Body=",  request_body)
+    if (self.aws_debug == true) then
+        ngx.log(ngx.DEBUG, "Calling AWS:", request_method, " ", scheme, "://", host, ":", port, request_path, ". Body=", request_body)
         local s = tableToString(request_headers)
-        ngx.log(ngx.DEBUG, "Calling AWS: Headers:", s )
+        ngx.log(ngx.DEBUG, "Calling AWS: Headers:", s)
     end
 
-    local ok, code, headers, status, body  = self:getHttpClient():request( self:getRequestObject({
-            scheme = scheme,
-            port = port,
-            timeout = timeout or 60000,
-            url = request_path, -- "/"
-            host = host,
-            body = request_body,
-            method = request_method,
-            headers = request_headers,
-            keepalive = self.aws_conn_keepalive or 30000, -- 30s keepalive
-            poolsize = self.aws_conn_pool or 100     -- max number of connections allowed in the connection pool
-    }) )
+    local ok, code, headers, status, body = self:getHttpClient():request(self:getRequestObject({
+        scheme = scheme,
+        port = port,
+        timeout = timeout or 60000,
+        url = request_path, -- "/"
+        host = host,
+        body = request_body,
+        method = request_method,
+        headers = request_headers,
+        keepalive = self.aws_conn_keepalive or 30000, -- 30s keepalive
+        poolsize = self.aws_conn_pool or 100 -- max number of connections allowed in the connection pool
+    }))
 
-    if (self.aws_debug == true ) then
+    if (self.aws_debug == true) then
         local s = tableToString(headers)
         ngx.log(ngx.DEBUG, "AWS Response:", "code=", code, ", headers=", s, ", status=", status, ", body=", body)
     end
