@@ -62,7 +62,7 @@ __DATA__
             set $aws_access_key $TEST_NGINX_AWS_CLIENT_ID;
             set $aws_secret_key $TEST_NGINX_AWS_SECRET;
             set $aws_region us-east-1;
-            set $aws_service kms;
+            set $aws_service sns;
 
             content_by_lua '
                 local SnsService = require "api-gateway.aws.sns.SnsService"

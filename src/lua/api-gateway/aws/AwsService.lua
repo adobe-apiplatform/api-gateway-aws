@@ -212,7 +212,7 @@ function _M:performAction(actionName, arguments, path, http_method, useSSL, time
 
     local authorization, awsAuth = self:getAuthorizationHeader(request_method, request_path, uri_args, request_body)
 
-    local t = "TrentService." .. actionName
+    local t = self.aws_service_name .. "." .. actionName
     local request_headers = {
         Authorization = authorization,
         ["X-Amz-Date"] = awsAuth.aws_date,

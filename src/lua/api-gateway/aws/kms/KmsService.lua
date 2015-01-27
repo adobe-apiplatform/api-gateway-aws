@@ -20,6 +20,8 @@ function _M.new(self,o)
     ngx.log(ngx.DEBUG, "KmsService() o=", tostring(o)  )
     local o = o or {}
     o.aws_service = "kms"
+    -- aws_service_name is used in the X-Amz-Target Header: i.e TrentService.ListAliases
+    o.aws_service_name = "TrentService"
 
     super.constructor(_M, o)
 

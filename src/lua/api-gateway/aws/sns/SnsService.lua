@@ -20,6 +20,8 @@ function _M.new(self, o)
     ngx.log(ngx.DEBUG, "SnsService() o=", tostring(o))
     local o = o or {}
     o.aws_service = "sns"
+    -- aws_service_name is used in the X-Amz-Target Header: i.e AmazonSimpleNotificationService.ListTopics
+    o.aws_service_name = "AmazonSimpleNotificationService"
 
     super.constructor(_M, o)
 

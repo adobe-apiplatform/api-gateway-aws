@@ -124,7 +124,7 @@ POST /test-signature?Subject=nginx:test!@$&TopicArn=arn:aws:sns:us-east-1:492299
                                     ["X-Amz-Date"] = awsAuth.aws_date,
                                     ["Content-Type"] = "application/x-www-form-urlencoded",
                                     ["Accept"] = "application/json",
-                                    ["X-Amz-Target"] = "TrentService.Publish"
+                                    ["X-Amz-Target"] = "AmazonSimpleNotificationService.Publish"
                                 }
                 }
                 ngx.say(ok)
