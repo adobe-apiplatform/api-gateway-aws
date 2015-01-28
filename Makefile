@@ -33,7 +33,7 @@ test:
 	TEST_NGINX_AWS_CLIENT_ID="${TEST_NGINX_AWS_CLIENT_ID}" TEST_NGINX_AWS_SECRET="${TEST_NGINX_AWS_SECRET}" PATH=/usr/local/sbin:$$PATH TEST_NGINX_SERVROOT=`pwd`/$(BUILD_DIR)/servroot TEST_NGINX_PORT=1989 prove -I ./test/resources/test-nginx/lib -r ./test/perl
 
 package:
-	git archive --format=tar --prefix=api-gateway-aws-1.0/ -o api-gateway-aws-1.0.tar.gz -v HEAD
+	git archive --format=tar --prefix=api-gateway-aws-1.1/ -o api-gateway-aws-1.1.tar.gz -v HEAD
 
 clean: all
 	rm -rf $(BUILD_DIR)/servroot
