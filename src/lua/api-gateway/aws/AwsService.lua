@@ -158,7 +158,7 @@ function _M:getRequestArguments(actionName, parameters)
     local urlencoded_args = "Action=" .. actionName
     if parameters ~= nil then
         for key, value in pairs(parameters) do
-            local proper_val = ngx.re.gsub(value, "&", "%26", "ijo")
+            local proper_val = ngx.re.gsub(tostring(value), "&", "%26", "ijo")
             urlencoded_args = urlencoded_args .. "&" .. key .. "=" .. (proper_val or "")
         end
     end
