@@ -91,6 +91,7 @@ __DATA__
 
             content_by_lua '
                 local KinesisService = require "api-gateway.aws.kinesis.KinesisService"
+                local cjson = require "cjson"
 
                 local service = KinesisService:new({
                     security_credentials_host = "127.0.0.1",
@@ -113,6 +114,26 @@ __DATA__
                     assert(table.getn(list.StreamNames) > 0, "At least one stream should have been created")
                 end
 
+                -- use putRecord to put a single record into DEFAULT_STREAM_NAME
+                local data = "testas"
+                local partitionKey = "partition"
+                local json_response, code, headers, status, body = service:putRecord(DEFAULT_STREAM_NAME, data, partitionKey)
+                assert( code == 200, "PutRecord Action should have returned with 200, but it returned with:" .. tostring(code) .. ", response:" .. tostring(body) )
+
+                -- use putRecords to put a batch of records
+                local records = {
+                    {
+                        Data = "55555",
+                        PartitionKey = "partitionKey1"
+                    },
+                    {
+                        Data = "7777777",
+                        PartitionKey = "partitionKey2"
+                    }
+                }
+                local json_response, code, headers, status, body = service:putRecords(DEFAULT_STREAM_NAME, records)
+                assert( code == 200, "PutRecords Action should have returned with 200, but it returned with:" .. tostring(code) .. ", response:" .. tostring(body) )
+                assert(json_response.FailedRecordCount == 0, "There are failed records during put")
 
                 -- pick the first stream
                 local streamName = list.StreamNames[1]
@@ -124,7 +145,6 @@ __DATA__
                     assert( code == 200, "DeleteStream Action should have returned with 200, but it returned with:" .. tostring(code) .. ", response:" .. tostring(body) )
                 end
 
-                -- TODO: test putRecords
             ';
         }
 --- timeout: 70

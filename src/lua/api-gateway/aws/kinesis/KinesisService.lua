@@ -65,8 +65,8 @@ end
 
 -- API: http://docs.aws.amazon.com/kinesis/latest/APIReference/API_ListStreams.html
 -- {
---    "ExclusiveStartStreamName": "string",
---    "Limit": number
+--    "ExclusiveStartStreamName": "string", --optional
+--    "Limit": number --optional
 -- }
 function _M:listStreams(streamName, limit)
     local arguments = {
@@ -81,6 +81,59 @@ function _M:listStreams(streamName, limit)
     return nil, code, headers, status, body
 end
 
+
+
+-- API: http://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecord.html
+-- {
+--    "StreamName": "string"
+--    "Data": blob,
+--    "PartitionKey": "string",
+-- }
+function _M:putRecord(streamName, data, partitionKey)
+    assert(streamName ~= nil, "Please provide a valid streamName.")
+    local arguments = {
+        StreamName = streamName,
+        Data = ngx.encode_base64(data),
+        PartitionKey = partitionKey
+    }
+    local ok, code, headers, status, body = self:performAction("PutRecord", arguments, "/", "POST", true)
+
+    if (code == ngx.HTTP_OK and body ~= nil) then
+        return cjson.decode(body), code, headers, status, body
+    end
+    return nil, code, headers, status, body
+end
+
+
+
+-- API: http://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html
+--  {
+--    "StreamName": "string"
+--    "Records": [
+--          {
+--              "Data": blob,
+--              "PartitionKey": "string"
+--          }
+--    ],
+--  }
+function _M:putRecords(streamName, records)
+    assert(streamName ~= nil, "Please provide a valid streamName.")
+    -- encode data for each of records as base64
+    for i, record in ipairs(records) do
+        record.Data = ngx.encode_base64(record.Data)
+    end
+
+    local arguments = {
+        StreamName = streamName,
+        Records = records
+    }
+    local ok, code, headers, status, body = self:performAction("PutRecords", arguments, "/", "POST", true)
+
+    if (code == ngx.HTTP_OK and body ~= nil) then
+        return cjson.decode(body), code, headers, status, body
+    end
+    return nil, code, headers, status, body
+end
 
 
 
