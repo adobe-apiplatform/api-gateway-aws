@@ -50,6 +50,40 @@ This library supports the latest AWS V4 signature which means you can use any of
 
 Synopsis
 ========
+### Kinesis
+
+```lua
+
+    local KinesisService = require "api-gateway.aws.kinesis.KinesisService"
+    local service = KinesisService:new({
+        aws_region = ngx.var.aws_region,
+        aws_secret_key = ngx.var.aws_secret_key,
+        aws_access_key = ngx.var.aws_access_key
+    })
+    
+    -- CreateStream
+    local response = service:createStream("test-stream")
+
+    -- ListStreams
+    local streams  = service:listStreams()
+
+    -- PutRecord
+    local response = service:putRecord("test-stream","test-message", "partitionKey")
+    
+    -- PutRecords
+    local records = {
+       {
+          Data = "test-data-1",
+          PartitionKey = "partitionKey-1"
+       },
+       {
+          Data = "test-data-2",
+          PartitionKey = "partitionKey-2"
+       }
+    }
+    local response = service:putRecords("test-stream", records)
+
+```
 
 ### SNS
 
