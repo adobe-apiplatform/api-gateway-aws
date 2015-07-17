@@ -177,8 +177,9 @@ end
 -- @param useSSL Call using HTTPS or HTTP. Default value is "HTTP"
 -- @param contentType Specifies how to deliver the content to the AWS Service.
 --         Possible values are:   "application/x-amz-json-1.1" or "application/x-www-form-urlencoded"
+-- @param extra_headers Any extra headers to be added to the request for the AWS Service
 --
-function _M:performAction(actionName, arguments, path, http_method, useSSL, timeout, contentType)
+function _M:performAction(actionName, arguments, path, http_method, useSSL, timeout, contentType, extra_headers)
     local host = self:getAWSHost()
     local credentials = self:getCredentials()
     local request_method = http_method or "GET"
@@ -221,6 +222,12 @@ function _M:performAction(actionName, arguments, path, http_method, useSSL, time
         ["X-Amz-Target"] = t,
         ["x-amz-security-token"] = credentials.token
     }
+    if ( extra_headers ~= nil ) then
+        for headerName, headerValue in pairs(extra_headers) do
+            request_headers[headerName] = headerValue
+        end
+    end
+
 
     -- this race condition has to be AFTER the authorization header has been calculated
     if request_method == "GET" then

@@ -73,7 +73,7 @@ function _M:invoke(functionName, payload, clientContext, invocationType, logType
     }
 
     -- actionName, arguments, path, http_method, useSSL, timeout, contentType
-    local ok, code, headers, status, body = self:performAction("Invoke", payload, path, "POST", true, 60000)
+    local ok, code, headers, status, body = self:performAction("Invoke", payload, path, "POST", true, 60000, "application/x-amz-json-1.1", extra_headers)
 
     if (code == ngx.HTTP_OK and body ~= nil) then
         return {}, code, headers, status, body
