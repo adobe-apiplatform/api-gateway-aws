@@ -19,12 +19,14 @@ install: all
 	$(INSTALL) -d $(DESTDIR)/$(LUA_LIB_DIR)/api-gateway/aws/s3/
 	$(INSTALL) -d $(DESTDIR)/$(LUA_LIB_DIR)/api-gateway/aws/sns/
 	$(INSTALL) -d $(DESTDIR)/$(LUA_LIB_DIR)/api-gateway/aws/kinesis/
+	$(INSTALL) -d $(DESTDIR)/$(LUA_LIB_DIR)/api-gateway/aws/lambda/
 	$(INSTALL) -d $(DESTDIR)/$(LUA_LIB_DIR)/api-gateway/aws/httpclient/
 	$(INSTALL) src/lua/api-gateway/aws/*.lua $(DESTDIR)/$(LUA_LIB_DIR)/api-gateway/aws/
 	$(INSTALL) src/lua/api-gateway/aws/httpclient/*.lua $(DESTDIR)/$(LUA_LIB_DIR)/api-gateway/aws/httpclient/
 	$(INSTALL) src/lua/api-gateway/aws/kms/*.lua $(DESTDIR)/$(LUA_LIB_DIR)/api-gateway/aws/kms/
 	$(INSTALL) src/lua/api-gateway/aws/sns/*.lua $(DESTDIR)/$(LUA_LIB_DIR)/api-gateway/aws/sns/
 	$(INSTALL) src/lua/api-gateway/aws/kinesis/*.lua $(DESTDIR)/$(LUA_LIB_DIR)/api-gateway/aws/kinesis/
+	$(INSTALL) src/lua/api-gateway/aws/lambda/*.lua $(DESTDIR)/$(LUA_LIB_DIR)/api-gateway/aws/lambda/
 #	$(INSTALL) src/lua/api-gateway/aws/s3/*.lua $(DESTDIR)/$(LUA_LIB_DIR)/api-gateway/aws/s3/
 
 test:
