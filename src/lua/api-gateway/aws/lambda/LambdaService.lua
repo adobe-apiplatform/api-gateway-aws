@@ -65,7 +65,7 @@ function _M:invoke(functionName, payload, clientContext, invocationType, logType
     --    X-Amz-Log-Type: LogType
     --
     --    Payload
-    local path = "/2015-03-31/functions/" .. functionName .. "/invocations"
+    local path = "/2015-03-31/functions/" .. ngx.escape_uri(functionName) .. "/invocations"
     local extra_headers = {
        ["X-Amz-Client-Context"] = clientContext,
        ["X-Amz-Invocation-Type"] = invocationType,
