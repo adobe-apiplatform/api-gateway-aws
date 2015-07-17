@@ -85,6 +85,83 @@ Synopsis
 
 ```
 
+### Lambda
+
+```lua
+
+    local LambdaService = require "api-gateway.aws.lambda.LambdaService"
+
+    local service = LambdaService:new({
+        aws_region = ngx.var.aws_region,
+        aws_debug = true,              -- print warn level messages on the nginx logs
+        aws_conn_keepalive = 60000,    -- how long to keep the sockets used for AWS alive
+        aws_conn_pool = 100            -- the connection pool size for sockets used to connect to AWS
+    })
+
+    --Invoke function
+    local payload = {
+                        key1 = "value-1",
+                        key2 = "value-2"
+                    }
+    local functionName = "hello-world-test"
+    local invokeResult, code, headers, status, body  = service:invoke(functionName, payload)
+    ngx.say("EXECUTION RESULT:" .. tostring(body))
+
+    --Invoke a Lambda function from another AWS account
+    functionName = "arn:aws:lambda:us-east-1:123123123123123:function:hello-world"
+    invokeResult, code, headers, status, body  = service:invoke(functionName, payload)
+    ngx.say("EXECUTION RESULT FROM ANOTHER AWS ACCOUNT:" .. tostring(body))
+
+```
+
+Note that in order to call a Lambda function cross AWS Accounts you need to have the correct policies in place.
+Let's say an EC2 node in the account `789789789789789` with a role `webserver` needs to call a lambda function defined in another AWS account `123123123123123`.
+
+1. Create a new Lambda function in account `123123123123123`, i.e `hello-world-lambda-fn`
+
+2. Make sure that the `webserver` role in account `789789789789789` can call Lambda functions from other AWS accounts.
+   Create a new role policy for `webserver`:
+
+```javascript
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "Stmt1437070759000",
+            "Effect": "Allow",
+            "Action": [
+                "lambda:InvokeFunction"
+            ],
+            "Resource": [
+                "arn:aws:lambda:*:*:*:*"
+            ]
+        }
+    ]
+}
+```
+
+3. Go to the other AWS Account `123123123123123` where you want to invoke the Lambda function and using AWS CLI add a new policy for your lambda function
+
+```bash
+$ aws lambda add-permission   \
+   --function-name hello-world-lambda-fn \
+   --statement-id stmt-lambda-Id-456 \
+   --action "lambda:InvokeFunction"  \
+   --principal arn:aws:iam::789789789789789:role/webserver
+   --region us-east-1
+-
+{
+    "Statement": "{\"Action\":[\"lambda:InvokeFunction\"],\"Resource\":\"arn:aws:lambda:us-east-1:123123123123123:function:hello-world-lambda-fn\",\"Effect\":\"Allow\",\"Principal\":{\"AWS\":\"arn:aws:iam::789789789789789:role/webserver\"},\"Sid\":\"stmt-lambda-Id-456\"}"
+}
+```
+You have to make sure that the user you're adding the permissions with does have the rights to `lambda:AddPermission` and `lambda:GetPolicy`.
+
+To verify you have the policy added you can execute:
+
+```bash
+aws lambda get-policy --function-name hello-world-lambda-fn --region=us-east-1
+```
+
 ### SNS
 
 ```lua
