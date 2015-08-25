@@ -149,7 +149,7 @@ $ aws lambda add-permission   \
    --action "lambda:InvokeFunction"  \
    --principal arn:aws:iam::789789789789789:role/webserver
    --region us-east-1
--
+# should yield
 {
     "Statement": "{\"Action\":[\"lambda:InvokeFunction\"],\"Resource\":\"arn:aws:lambda:us-east-1:123123123123123:function:hello-world-lambda-fn\",\"Effect\":\"Allow\",\"Principal\":{\"AWS\":\"arn:aws:iam::789789789789789:role/webserver\"},\"Sid\":\"stmt-lambda-Id-456\"}"
 }
