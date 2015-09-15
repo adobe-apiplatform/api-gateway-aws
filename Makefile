@@ -38,9 +38,9 @@ test:
 	TEST_NGINX_AWS_CLIENT_ID="${TEST_NGINX_AWS_CLIENT_ID}" TEST_NGINX_AWS_SECRET="${TEST_NGINX_AWS_SECRET}" TEST_NGINX_AWS_SECURITY_TOKEN="${TEST_NGINX_AWS_SECURITY_TOKEN}" PATH=/usr/local/sbin:$$PATH TEST_NGINX_SERVROOT=`pwd`/$(BUILD_DIR)/servroot TEST_NGINX_PORT=1989 prove -I ./test/resources/test-nginx/lib -r ./test/perl
 
 package:
-	git tag -a v1.4 -m 'release-1.4'
-	git push origin v1.4
-	git archive --format=tar --prefix=api-gateway-aws-1.4/ -o api-gateway-aws-1.4.tar.gz -v HEAD
+	git tag -a v1.5 -m 'release-1.5'
+	git push origin v1.5
+	git archive --format=tar --prefix=api-gateway-aws-1.5/ -o api-gateway-aws-1.4.tar.gz -v HEAD
 
 clean: all
 	rm -rf $(BUILD_DIR)/servroot
