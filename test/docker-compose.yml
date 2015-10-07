@@ -1,0 +1,14 @@
+gateway:
+  image: adobeapiplatform/apigateway
+  volumes:
+    - ~/tmp/apiplatform/api-gateway-aws/src/lua/api-gateway/aws:/usr/local/api-gateway/lualib/api-gateway/aws
+    - ~/tmp/apiplatform/api-gateway-aws/test/perl:/tmp/perl
+    - ~/tmp/apiplatform/api-gateway-aws/test/integration:/tmp/integration
+    - ~/tmp/apiplatform/api-gateway-aws/target/:/t
+  environment:
+    - LOG_LEVEL=debug
+    - TEST_NGINX_AWS_CLIENT_ID
+    - TEST_NGINX_AWS_SECRET
+    - TEST_NGINX_AWS_SECURITY_TOKEN
+    - TEST_NGINX_PORT=1989
+  entrypoint: ["prove", "-I", "/usr/local/test-nginx-0.24/lib", "-I", "/usr/local/test-nginx-0.24/inc", "-r", "/tmp/perl"]

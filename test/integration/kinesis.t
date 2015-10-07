@@ -1,5 +1,5 @@
 #  Running this unit test:
-# TEST_NGINX_AWS_SECRET=${AWS_SECRET_ACCESS_KEY} TEST_NGINX_AWS_CLIENT_ID=${AWS_ACCESS_KEY_ID} TEST_NGINX_AWS_TOKEN=${AWS_SECURITY_TOKEN} PATH=/usr/local/sbin:$PATH TEST_NGINX_SERVROOT=`pwd`/target/servroot TEST_NGINX_PORT=1989 prove -I ./test/resources/test-nginx/lib -r ./test/perl/kinesis.t
+# TEST_NGINX_AWS_SECRET=${AWS_SECRET_ACCESS_KEY} TEST_NGINX_AWS_CLIENT_ID=${AWS_ACCESS_KEY_ID} TEST_NGINX_AWS_SECURITY_TOKEN=${AWS_SECURITY_TOKEN} PATH=/usr/local/sbin:$PATH TEST_NGINX_SERVROOT=`pwd`/target/servroot TEST_NGINX_PORT=1989 prove -I ./test/resources/test-nginx/lib -r ./test/perl/kinesis.t
 
 # vim:set ft= ts=4 sw=4 et fdm=marker:
 use lib 'lib';
@@ -77,14 +77,14 @@ __DATA__
                           "Type" : "AWS-HMAC",
                           "AccessKeyId" : "$TEST_NGINX_AWS_CLIENT_ID",
                           "SecretAccessKey" : "$TEST_NGINX_AWS_SECRET",
-                          "Token" : "$TEST_NGINX_AWS_TOKEN",
+                          "Token" : "$TEST_NGINX_AWS_SECURITY_TOKEN",
                           "Expiration" : "$expiration"
                         }';
         }
 
         location /test {
-            set $aws_access_key $TEST_NGINX_AWS_CLIENT_ID;
-            set $aws_secret_key $TEST_NGINX_AWS_SECRET;
+            set $aws_access_key '$TEST_NGINX_AWS_CLIENT_ID';
+            set $aws_secret_key '$TEST_NGINX_AWS_SECRET';
             set $aws_region us-east-1;
             set $aws_service kms;
 

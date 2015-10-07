@@ -57,10 +57,25 @@ __DATA__
 === TEST 1: test SNS
 --- http_config eval: $::HttpConfig
 --- config
+        error_log ../sns_test1_error.log debug;
+
+        location = /latest/meta-data/iam/security-credentials/ {
+            return 200 'test-iam-user';
+        }
+
+        location = /latest/meta-data/iam/security-credentials/test-iam-user {
+            return 200 '{
+                          "Code" : "Success",
+                          "LastUpdated" : "2014-11-03T01:56:20Z",
+                          "Type" : "AWS-HMAC",
+                          "AccessKeyId" : "$TEST_NGINX_AWS_CLIENT_ID",
+                          "SecretAccessKey" : "$TEST_NGINX_AWS_SECRET",
+                          "Token" : "$TEST_NGINX_AWS_SECURITY_TOKEN",
+                          "Expiration" : "2014-11-03T08:07:52Z"
+                        }';
+        }
+
         location /test {
-            # stg:  :
-            set $aws_access_key $TEST_NGINX_AWS_CLIENT_ID;
-            set $aws_secret_key $TEST_NGINX_AWS_SECRET;
             set $aws_region us-east-1;
             set $aws_service sns;
 
@@ -68,9 +83,9 @@ __DATA__
                 local SnsService = require "api-gateway.aws.sns.SnsService"
 
                 local service = SnsService:new({
+                    security_credentials_host = "127.0.0.1",
+                    security_credentials_port = $TEST_NGINX_PORT,
                     aws_region = ngx.var.aws_region,
-                    aws_secret_key = ngx.var.aws_secret_key,
-                    aws_access_key = ngx.var.aws_access_key,
                     aws_debug = true,              -- print warn level messages on the nginx logs
                     aws_conn_keepalive = 60000,    -- how long to keep the sockets used for AWS alive
                     aws_conn_pool = 100            -- the connection pool size for sockets used to connect to AWS
@@ -105,20 +120,35 @@ X-Test: test
 === TEST 2: test SNS with special chars in message
 --- http_config eval: $::HttpConfig
 --- config
+        error_log ../sns_test2_error.log debug;
+
+        location = /latest/meta-data/iam/security-credentials/ {
+            return 200 'test-iam-user';
+        }
+
+        location = /latest/meta-data/iam/security-credentials/test-iam-user {
+            return 200 '{
+                          "Code" : "Success",
+                          "LastUpdated" : "2014-11-03T01:56:20Z",
+                          "Type" : "AWS-HMAC",
+                          "AccessKeyId" : "$TEST_NGINX_AWS_CLIENT_ID",
+                          "SecretAccessKey" : "$TEST_NGINX_AWS_SECRET",
+                          "Token" : "$TEST_NGINX_AWS_SECURITY_TOKEN",
+                          "Expiration" : "2014-11-03T08:07:52Z"
+                        }';
+        }
+
         location /test {
-            # stg:  :
-            set $aws_access_key $TEST_NGINX_AWS_CLIENT_ID;
-            set $aws_secret_key $TEST_NGINX_AWS_SECRET;
             set $aws_region us-east-1;
-            set $aws_service kms;
+            set $aws_service sns;
 
             content_by_lua '
                 local SnsService = require "api-gateway.aws.sns.SnsService"
 
                 local service = SnsService:new({
+                    security_credentials_host = "127.0.0.1",
+                    security_credentials_port = $TEST_NGINX_PORT,
                     aws_region = ngx.var.aws_region,
-                    aws_secret_key = ngx.var.aws_secret_key,
-                    aws_access_key = ngx.var.aws_access_key,
                     aws_debug = true,              -- print warn level messages on the nginx logs
                     aws_conn_keepalive = 60000,    -- how long to keep the sockets used for AWS alive
                     aws_conn_pool = 100            -- the connection pool size for sockets used to connect to AWS
@@ -126,6 +156,7 @@ X-Test: test
 
                 -- search for aliases
                 local list  = service:listTopics()
+                ngx.sleep(2)
                 assert(list ~= nil, "ListTopics should return at least 1 topic")
 
                 -- pick the first topic
