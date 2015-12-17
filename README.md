@@ -26,7 +26,7 @@ Description
 
 This library requires an nginx build with OpenSSL,
 the [ngx_lua module](http://wiki.nginx.org/HttpLuaModule), [LuaJIT 2.0](http://luajit.org/luajit.html) and
-[api-gateway-hmac](https://git.corp.adobe.com/adobe-apis/api-gateway-hmac) module.
+[api-gateway-hmac](https://github.com/adobe-apiplatform/api-gateway-hmac) module.
 
 ### AWS V4 Signature
 This library supports the latest AWS V4 signature which means you can use any of the latest AWS APIs without any problem.
