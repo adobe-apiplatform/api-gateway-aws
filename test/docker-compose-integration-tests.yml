@@ -11,4 +11,4 @@ gateway:
     - TEST_NGINX_AWS_SECRET
     - TEST_NGINX_AWS_SECURITY_TOKEN
     - TEST_NGINX_PORT=1989
-  entrypoint: ["prove", "-I", "/usr/local/test-nginx-0.24/lib", "-I", "/usr/local/test-nginx-0.24/inc", "-r", "/tmp/perl"]
+  entrypoint: ["prove", "-I", "/usr/local/test-nginx-0.24/lib", "-I", "/usr/local/test-nginx-0.24/inc", "-r", "/tmp/integration"]

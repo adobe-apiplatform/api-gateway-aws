@@ -1,3 +1,19 @@
+--[[
+  Copyright (c) 2016. Adobe Systems Incorporated. All rights reserved.
+
+    This file is licensed to you under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software distributed under the License is
+    distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR RESPRESENTATIONS OF ANY KIND,
+    either express or implied.  See the License for the specific language governing permissions and
+    limitations under the License.
+
+  ]]
+
 --- Base Class for working with AWS Services.
 -- It's responsible for making API Requests to most of the AWS Services
 --
@@ -13,11 +29,13 @@ local setmetatable = setmetatable
 local error = error
 local debug_mode = ngx.config.debug
 local http = require"api-gateway.aws.httpclient.http"
+local http_resty = require"api-gateway.aws.httpclient.restyhttp"
 local AWSV4S = require"api-gateway.aws.AwsV4Signature"
 local IamCredentials = require"api-gateway.aws.AWSIAMCredentials"
 local cjson = require"cjson"
 
 local http_client = http:new()
+local http_client_resty = http_resty:new()
 local iam_credentials
 
 local function tableToString(table_ref)
@@ -98,7 +116,9 @@ function _M:debug(...)
 end
 
 function _M:getHttpClient()
-    return http_client
+--    return http_client -- the original http_client which will be deprecated and removed soon
+    -- by default use the new http client that uses resty.http module
+    return http_client_resty
 end
 
 function _M:getAWSHost()
@@ -242,6 +262,7 @@ function _M:performAction(actionName, arguments, path, http_method, useSSL, time
 
     local ok, code, headers, status, body = self:getHttpClient():request(self:getRequestObject({
         scheme = scheme,
+        ssl_verify = false,
         port = port,
         timeout = timeout or 60000,
         url = request_path, -- "/"
@@ -262,8 +283,3 @@ function _M:performAction(actionName, arguments, path, http_method, useSSL, time
 end
 
 return _M
-
-
-
-
-

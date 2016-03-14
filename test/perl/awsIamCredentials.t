@@ -46,6 +46,10 @@ our $HttpConfig = <<_EOC_;
     ';
     lua_shared_dict shared_cache 1m;
     resolver @nameservers;
+
+    client_body_temp_path /tmp/;
+    proxy_temp_path /tmp/;
+    fastcgi_temp_path /tmp/;
 _EOC_
 
 #no_diff();

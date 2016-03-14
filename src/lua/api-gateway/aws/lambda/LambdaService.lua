@@ -45,10 +45,7 @@ function _M:listFunctions(marker, maxItems)
 end
 
 -- API: http://docs.aws.amazon.com/lambda/latest/dg/API_Invoke.html
--- {
---    "ShardCount": number,
---    "StreamName": "string"
--- }
+--
 function _M:invoke(functionName, payload, clientContext, invocationType, logType)
     assert(functionName ~= nil, "Please provide a valid functionName.")
     local invocationType = invocationType or "RequestResponse"
