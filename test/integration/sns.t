@@ -1,5 +1,7 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
 use lib 'lib';
+use strict;
+use warnings;
 use Test::Nginx::Socket::Lua;
 use Cwd qw(cwd);
 
@@ -45,6 +47,10 @@ our $HttpConfig = <<_EOC_;
         require "resty.core"
     ';
     resolver @nameservers;
+
+    client_body_temp_path /tmp/;
+    proxy_temp_path /tmp/;
+    fastcgi_temp_path /tmp/;
 _EOC_
 
 #no_diff();
@@ -172,6 +178,8 @@ X-Test: test
                 ngx.say("Message_ID:" .. tostring(messageId))
             ';
         }
+
+--- timeout: 70
 --- more_headers
 X-Test: test
 --- request

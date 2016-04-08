@@ -44,6 +44,21 @@ test-docker:
 	cp -r ~/tmp/apiplatform/api-gateway-aws/target/ ./target
 	rm -rf  ~/tmp/apiplatform/api-gateway-aws
 
+integration-test-docker:
+	echo "running integration-tests with docker ..."
+	mkdir  -p $(BUILD_DIR)
+	mkdir  -p $(BUILD_DIR)/test-logs
+#	cp -r test/resources/api-gateway $(BUILD_DIR)
+#	sed -i '' 's/127\.0\.0\.1/redis\.docker/g' $(BUILD_DIR)/api-gateway/redis-upstream.conf
+	rm -f $(BUILD_DIR)/test-logs/*
+	mkdir -p ~/tmp/apiplatform/api-gateway-aws
+	cp -r ./src ~/tmp/apiplatform/api-gateway-aws/
+	cp -r ./test ~/tmp/apiplatform/api-gateway-aws/
+	cp -r ./target ~/tmp/apiplatform/api-gateway-aws/
+	TEST_NGINX_AWS_CLIENT_ID="${TEST_NGINX_AWS_CLIENT_ID}" TEST_NGINX_AWS_SECRET="${TEST_NGINX_AWS_SECRET}" TEST_NGINX_AWS_SECURITY_TOKEN="${TEST_NGINX_AWS_SECURITY_TOKEN}" docker-compose -f ./test/docker-compose-integration-tests.yml up
+	cp -r ~/tmp/apiplatform/api-gateway-aws/target/ ./target
+	rm -rf  ~/tmp/apiplatform/api-gateway-aws
+
 test:
 	echo "updating git submodules ..."
 	if [ ! -d "test/resources/test-nginx/lib" ]; then	git submodule update --init --recursive; fi
