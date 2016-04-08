@@ -1,5 +1,5 @@
 gateway:
-  image: cellos/apigateway:1.9.7.3
+  image: adobeapiplatform/apigateway:latest
   volumes:
     - ~/tmp/apiplatform/api-gateway-aws/src/lua/api-gateway/aws:/usr/local/api-gateway/lualib/api-gateway/aws
     - ~/tmp/apiplatform/api-gateway-aws/test/perl:/tmp/perl
