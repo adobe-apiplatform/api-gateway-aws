@@ -22,12 +22,17 @@ function _M.new(self, o)
     return o
 end
 
----
--- @param roleARN
--- @param roleSessionName
--- @param policy
--- @param durationSeconds
--- @param externalId
+--- @see http://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRole.html
+-- @param roleARN The Amazon Resource Name (ARN) of the role to assume. Type: String
+--          Length Constraints: Minimum length of 20. Maximum length of 2048.
+--          Required
+-- @param roleSessionName An identifier for the assumed role session.
+--          Use it when the same role is assumed by different principals or for different reasons/policy.
+--          Required
+-- @param policy  An IAM policy in JSON format.
+-- @param durationSeconds The duration, in seconds, of the role session.
+--          Valid Range: Minimum value of 900. Maximum value of 3600.
+-- @param externalId A unique identifier used by third parties
 --
 function _M:assumeRole(roleARN, roleSessionName, policy, durationSeconds, externalId)
     assert(roleARN ~= nil, "Please provide a valid roleARN." )

@@ -18,7 +18,7 @@ local DEFAULT_SECURITY_CREDENTIALS_URL = "/latest/meta-data/iam/security-credent
 -- use GET /latest/meta-data/iam/security-credentials/ to auto-discover the IAM Role
 local DEFAULT_TOKEN_EXPIRATION = 60*60*24 -- in seconds
 
--- configur cache Manager for IAM crendentials
+-- configure cache Manager for IAM crendentials
 local iamCache = cacheCls:new()
 
 -- per nginx process cache to store IAM credentials
@@ -45,7 +45,6 @@ local function initIamCache(shared_cache_dict)
         dict = shared_cache_dict,
         ttl = function (value)
             local value_o = cjson.decode(value)
-            ngx.log(ngx.DEBUG, "ExpireAt=", tostring(value_o.ExpireAt))
             local expiryTimeUTC = value.ExpireAtTimestamp or awsDate.convertDateStringToTimestamp(value_o.ExpireAt, true)
             local expiryTimeInSeconds = expiryTimeUTC - os.time()
             return math.min(DEFAULT_TOKEN_EXPIRATION, expiryTimeInSeconds)
