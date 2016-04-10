@@ -1,5 +1,7 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
 use lib 'lib';
+use strict;
+use warnings;
 use Test::Nginx::Socket::Lua;
 use Cwd qw(cwd);
 
@@ -62,6 +64,8 @@ __DATA__
 === TEST 1: test auto discovery of iam user
 --- http_config eval: $::HttpConfig
 --- config
+        error_log ../awsIamCredentials_test1_error.log debug;
+
         location = /latest/meta-data/iam/security-credentials/ {
             return 200 'test-iam-user';
         }
@@ -93,6 +97,8 @@ X-Test: test
 === TEST 2: test Iam can automatically read credentials
 --- http_config eval: $::HttpConfig
 --- config
+        error_log ../awsIamCredentials_test2_error.log debug;
+
         location = /latest/meta-data/iam/security-credentials/ {
             return 200 'test-iam-user';
         }
@@ -178,6 +184,8 @@ X-Test: test
 === TEST 3: test Iam can automatically read credentials with SHARED DICT
 --- http_config eval: $::HttpConfig
 --- config
+        error_log ../awsIamCredentials_test3_error.log debug;
+
         location = /latest/meta-data/iam/security-credentials/ {
             return 200 'test-iam-user';
         }
@@ -212,6 +220,7 @@ X-Test: test
 
         location /test {
             content_by_lua '
+                local cjson = require "cjson"
                 local IamCredentials = require "api-gateway.aws.AWSIAMCredentials"
                 local iam = IamCredentials:new({
                     security_credentials_host = "127.0.0.1",
@@ -223,7 +232,7 @@ X-Test: test
                 ngx.say("key=" .. key .. ", secret=" .. secret .. ", token=" .. token .. ", date=" .. date .. ", timestamp=" ..timestamp )
 
                 local shared_cache = ngx.shared["shared_cache"]
-                assert( shared_cache:get("AccessKeyId") == nil, "Expired token should not be saved in shared cache")
+                assert( shared_cache:get("iam_credentials") == nil, "iam_credentials should not be saved in shared cache, but found:" .. tostring(shared_cache:get("iam_credentials")))
 
                 -- the previous token should be expired and a new call to fetch credentials should get a new token
                 -- changing the iam_user will cause the IamCredentials to use this one when fetching new credentials
@@ -238,12 +247,14 @@ X-Test: test
                 if ( date ~= d ) then
                     error("Dates should match. Got" .. date .. ", Expected: " .. d)
                 end
-
-                assert( shared_cache:get("AccessKeyId") ~= nil, "AccessKeyId should be saved in shared cache")
-                assert( shared_cache:get("SecretAccessKey") ~= nil, "SecretAccessKey should be saved in shared cache")
-                assert( shared_cache:get("Token") ~= nil, "Token should be saved in shared cache")
-                assert( shared_cache:get("ExpireAt") ~= nil, "ExpireAt should be saved in shared cache")
-                assert( shared_cache:get("ExpireAtTimestamp") ~= nil, "ExpireAtTimestamp should be saved in shared cache")
+                local cachedIam = shared_cache:get("iam_credentials")
+                cachedIam = cjson.decode(cachedIam)
+                assert( cachedIam ~= nil, "iam_credentials should be saved in shared cache")
+                assert( cachedIam.AccessKeyId ~= nil, "AccessKeyId should be saved in shared cache")
+                assert( cachedIam.SecretAccessKey ~= nil, "SecretAccessKey should be saved in shared cache")
+                assert( cachedIam.Token ~= nil, "Token should be saved in shared cache")
+                assert( cachedIam.ExpireAt ~= nil, "ExpireAt should be saved in shared cache")
+                assert( cachedIam.ExpireAtTimestamp ~= nil, "ExpireAtTimestamp should be saved in shared cache")
 
                 ngx.sleep(3)
 
