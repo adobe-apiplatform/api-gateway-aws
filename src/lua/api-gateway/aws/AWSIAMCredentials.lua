@@ -6,15 +6,20 @@
 -- To change this template use File | Settings | File Templates.
 --
 
-local cjson = require"cjson"
-local http = require"api-gateway.aws.httpclient.http"
-local url = require"api-gateway.aws.httpclient.url"
+local cjson = require "cjson"
+local http = require "api-gateway.aws.httpclient.http"
+local url = require "api-gateway.aws.httpclient.url"
+local awsDate = require "api-gateway.aws.AwsDateConverter"
+local cacheCls = require "api-gateway.cache.cache"
 
 local DEFAULT_SECURITY_CREDENTIALS_HOST = "169.254.169.254"
 local DEFAULT_SECURITY_CREDENTIALS_PORT = "80"
 local DEFAULT_SECURITY_CREDENTIALS_URL = "/latest/meta-data/iam/security-credentials/"
 -- use GET /latest/meta-data/iam/security-credentials/ to auto-discover the IAM Role
 local DEFAULT_TOKEN_EXPIRATION = 60*60*24 -- in seconds
+
+-- configur cache Manager for IAM crendentials
+local iamCache = cacheCls:new()
 
 -- per nginx process cache to store IAM credentials
 local cache = {
@@ -26,8 +31,6 @@ local cache = {
     ExpireAtTimestamp = nil
 }
 
-local sharedCacheDictInstance
-
 local function tableToString(table_ref)
     local s = ""
     local o = table_ref or {}
@@ -35,6 +38,21 @@ local function tableToString(table_ref)
         s = s .. ", " .. k .. "=" .. tostring(v)
     end
     return s
+end
+
+local function initIamCache(shared_cache_dict)
+    local localCache = require "api-gateway.cache.store.localCache":new({
+        dict = shared_cache_dict,
+        ttl = function (value)
+            local value_o = cjson.decode(value)
+            ngx.log(ngx.DEBUG, "ExpireAt=", tostring(value_o.ExpireAt))
+            local expiryTimeUTC = value.ExpireAtTimestamp or awsDate.convertDateStringToTimestamp(value_o.ExpireAt, true)
+            local expiryTimeInSeconds = expiryTimeUTC - os.time()
+            return math.min(DEFAULT_TOKEN_EXPIRATION, expiryTimeInSeconds)
+        end
+    })
+
+    iamCache:addStore(localCache)
 end
 
 local AWSIAMCredentials = {}
@@ -60,7 +78,7 @@ function AWSIAMCredentials:new(o)
         self.security_credentials_url = o.security_credentials_url or DEFAULT_SECURITY_CREDENTIALS_URL
         self.shared_cache_dict = o.shared_cache_dict
         if (o.shared_cache_dict ~= nil) then
-            sharedCacheDictInstance = ngx.shared[o.shared_cache_dict]
+            initIamCache(o.shared_cache_dict)
         end
         local s = tableToString(o)
         ngx.log(ngx.DEBUG, "Initializing AWSIAMCredentials with object:", s)
@@ -68,65 +86,17 @@ function AWSIAMCredentials:new(o)
     return o
 end
 
-local function getTimestamp(dateString, convertToUTC)
-    local pattern = "(%d+)%-(%d+)%-(%d+)T(%d+):(%d+):(%d+)Z"
-    local xyear, xmonth, xday, xhour, xminute,
-    xseconds, xoffset, xoffsethour, xoffsetmin = dateString:match(pattern)
-
-    -- the converted timestamp is in the local timezone
-    local convertedTimestamp = os.time({
-        year = xyear,
-        month = xmonth,
-        day = xday,
-        hour = xhour,
-        min = xminute,
-        sec = xseconds
-    })
-    if (convertToUTC == true) then
-        local offset = os.time() - os.time(os.date("!*t"))
-        convertedTimestamp = convertedTimestamp + offset
-    end
-    return tonumber(convertedTimestamp)
-end
-
-function AWSIAMCredentials:saveCredentialsInSharedDict()
-    if (sharedCacheDictInstance == nil) then
-        ngx.log(ngx.WARN, "No shared_cache_dict provided to AWSIAMCredentials. To improve performance please define one.")
-        return
-    end
-
-    local expiry_time_utc = getTimestamp(cache.ExpireAt, true)
-    local expire_in_sec = expiry_time_utc - os.time()
-    if ( expire_in_sec > 0 ) then
-        -- set the values and the expiry time
-        sharedCacheDictInstance:set("AccessKeyId", cache.AccessKeyId, expire_in_sec)
-        sharedCacheDictInstance:set("SecretAccessKey", cache.SecretAccessKey, expire_in_sec)
-        sharedCacheDictInstance:set("Token", cache.Token, expire_in_sec)
-        sharedCacheDictInstance:set("ExpireAt", cache.ExpireAt, expire_in_sec)
-        sharedCacheDictInstance:set("ExpireAtTimestamp", cache.ExpireAtTimestamp, expire_in_sec)
-
-        ngx.log(ngx.DEBUG, "IAM Credentials cached for ", tostring(expire_in_sec), " seconds in the shared dict=", self.shared_cache_dict)
-    end
-end
-
 function AWSIAMCredentials:loadCredentialsFromSharedDict()
-    if (sharedCacheDictInstance == nil) then
-        ngx.log(ngx.WARN, "No shared_cache_dict provided to AWSIAMCredentials. To improve performance please define one.")
-        return
+    local iamCreds = iamCache:get("iam_credentials")
+    if (iamCreds ~= nil) then
+        iamCreds = cjson.decode(iamCreds)
+        cache.AccessKeyId = iamCreds.AccessKeyId
+        cache.SecretAccessKey = iamCreds.SecretAccessKey
+        cache.Token = iamCreds.Token
+        cache.ExpireAt = iamCreds.ExpireAt
+        cache.ExpireAtTimestamp = iamCreds.ExpireAtTimestamp
+        ngx.log(ngx.DEBUG, "Cache has been loaded from Shared Cache" )
     end
-    -- see if there's something in the shared dict that didn't expire yet
-    local accessKeyId = sharedCacheDictInstance:get("AccessKeyId")
-    if ( accessKeyId == nil ) then
-        ngx.log(ngx.DEBUG, "nothing found in Shared Cache")
-        return
-    end
-
-    cache.AccessKeyId = sharedCacheDictInstance:get("AccessKeyId")
-    cache.SecretAccessKey = sharedCacheDictInstance:get("SecretAccessKey")
-    cache.Token = sharedCacheDictInstance:get("Token")
-    cache.ExpireAt = sharedCacheDictInstance:get("ExpireAt")
-    cache.ExpireAtTimestamp = sharedCacheDictInstance:get("ExpireAtTimestamp")
-    ngx.log(ngx.DEBUG, "Cache has been loaded from Shared Cache" )
 end
 
 ---
@@ -190,8 +160,10 @@ function AWSIAMCredentials:fetchSecurityCredentialsFromAWS()
         --local token = url:encodeUrl(aws_response["Token"])
         cache.Token = aws_response["Token"]
         cache.ExpireAt = aws_response["Expiration"]
-        cache.ExpireAtTimestamp = getTimestamp(cache.ExpireAt, true)
-        self:saveCredentialsInSharedDict()
+        cache.ExpireAtTimestamp = awsDate.convertDateStringToTimestamp(cache.ExpireAt, true)
+        if (cache.ExpireAtTimestamp - os.time() > 0) then
+            iamCache:put("iam_credentials", cjson.encode(cache))
+        end
         return true
     end
 
