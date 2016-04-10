@@ -31,8 +31,6 @@ local cache = {
     ExpireAtTimestamp = nil
 }
 
-local sharedCacheDictInstance
-
 local function tableToString(table_ref)
     local s = ""
     local o = table_ref or {}
@@ -80,7 +78,6 @@ function AWSIAMCredentials:new(o)
         self.security_credentials_url = o.security_credentials_url or DEFAULT_SECURITY_CREDENTIALS_URL
         self.shared_cache_dict = o.shared_cache_dict
         if (o.shared_cache_dict ~= nil) then
-            sharedCacheDictInstance = ngx.shared[o.shared_cache_dict]
             initIamCache(o.shared_cache_dict)
         end
         local s = tableToString(o)
