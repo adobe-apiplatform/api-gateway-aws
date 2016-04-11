@@ -321,7 +321,7 @@ Let's say that the AWS account `A` needs to send records to a Kinesis stream in 
                 external_id)       
 ```
 
-More documentation on how to configure the accounts [here](http://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-user_externalid.html).
+>INFO: For more information on how to configure the accounts see [How to Use an External ID When Granting Access to Your AWS Resources to a Third Party](http://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-user_externalid.html).
 
 [Back to TOC](#table-of-contents)
 
