@@ -13,7 +13,7 @@ function _M.new(self, o)
     local o = o or {}
     o.aws_service = "sts"
     -- aws_service_name is used in the X-Amz-Target Header: i.e Kinesis_20131202.ListStreams
-    o.aws_service_name = "STS_20110615"
+    o.aws_service_name = "AWSSecurityTokenServiceV20110615"
 
     super.constructor(_M, o)
 
@@ -38,13 +38,14 @@ function _M:assumeRole(roleARN, roleSessionName, policy, durationSeconds, extern
     assert(roleARN ~= nil, "Please provide a valid roleARN." )
     assert(roleSessionName ~= nil, "Please provide a valid roleSessionName." )
     local arguments = {
+        Version="2011-06-15",
         RoleArn = roleARN,
         RoleSessionName = roleSessionName,
         Policy = policy,
         DurationSeconds = durationSeconds or 3600,
         ExternalId = externalId
     }
-    local ok, code, headers, status, body = self:performAction("AssumeRole", arguments, "/", "POST", true)
+    local ok, code, headers, status, body = self:performAction("AssumeRole", arguments, "/", "POST", true, 30000, "application/x-www-form-urlencoded")
 
     if (code == ngx.HTTP_OK and body ~= nil) then
         return cjson.decode(body), code, headers, status, body

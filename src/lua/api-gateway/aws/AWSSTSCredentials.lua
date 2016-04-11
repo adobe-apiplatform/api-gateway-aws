@@ -15,7 +15,9 @@
 -- Date: 19/03/16
 -- Time: 21:26
 --
+local cjson = require "cjson"
 local SecurityTokenService = require "api-gateway.aws.sts.SecurityTokenService"
+local awsDate = require "api-gateway.aws.AwsDateConverter"
 local cacheCls = require "api-gateway.cache.cache"
 
 local _M = {}
@@ -37,7 +39,7 @@ local function initStsCache(shared_cache_dict)
         dict = shared_cache_dict,
         ttl = function (value)
             local value_o = cjson.decode(value)
-            local expiryTimeUTC = value.ExpireAtTimestamp or awsDate.convertDateStringToTimestamp(value_o.ExpireAt, true)
+            local expiryTimeUTC = value.ExpireAtTimestamp or value_o.ExpireAt -- ExpireAt is already an epoch time awsDate.convertDateStringToTimestamp(value_o.ExpireAt, true)
             local expiryTimeInSeconds = expiryTimeUTC - os.time()
             return math.min(DEFAULT_TOKEN_EXPIRATION, expiryTimeInSeconds)
         end
@@ -78,21 +80,51 @@ function _M:new(o)
         self.iam_security_credentials_url = o.iam_security_credentials_url or IAM_DEFAULT_SECURITY_CREDENTIALS_URL
 
         -- config options for static AWS Credetials
-        self.aws_region = o.aws_region or "us-east-1"
+        self.aws_region = o.aws_region or "us-east-1" -- TBD: when aws_region is not provided should it go to sts.amazonaws.com ?
         self.aws_secret_key = o.aws_secret_key
         self.aws_access_key = o.aws_access_key
 
         -- shared dict used to cache STS and IAM credentials
         self.shared_cache_dict = o.shared_cache_dict
+        if (self.shared_cache_dict) then
+            initStsCache(self.shared_cache_dict)
+        end
     end
     return o
 end
 
+---
+-- Return credentials from AWS' Security Token Service
+-- Sample response from STS :
+
+--    {
+--        "AssumeRoleResponse": {
+--            "AssumeRoleResult": {
+--                    "AssumedRoleUser": {
+--                        "Arn": "arn:aws:sts::123456789012:assumed-role/xaccounts3access/s3-access-example",
+--                        "AssumedRoleId": "AROAJEMMODNR6NAEO0000:s3-access-example"
+--                     },
+--                     "Credentials": {
+--                           "AccessKeyId": "access-key",
+--                           "Expiration": 1460355675,
+--                           "SecretAccessKey": "some-secret",
+--                           "SessionToken": "session-token"
+--                    },
+--                    "PackedPolicySize": null
+--            },
+--            "ResponseMetadata": {
+--                    "RequestId": "91609a0a-ffa2-11e5-97e6-bbbbbbbbb"
+--            }
+--       }
+--}
+
 function _M:getCredentialsFromSTS()
     local sts = SecurityTokenService:new({
-        security_credentials_host = self.security_credentials_host,
-        security_credentials_port = self.security_credentials_port,
-        aws_region = "us-east-1",
+        shared_cache_dict = self.shared_cache_dict,
+        security_credentials_host = self.iam_security_credentials_host,
+        security_credentials_port = self.iam_security_credentials_port,
+        aws_debug = self.aws_debug,
+        aws_region = self.aws_region,
         aws_conn_keepalive = 60000, -- how long to keep the sockets used for AWS alive
         aws_conn_pool = 10 -- the connection pool size for sockets used to connect to AWS
     })
@@ -102,12 +134,42 @@ function _M:getCredentialsFromSTS()
         self.security_credentials_timeout,
         self.external_id)
 
+    if (code ~= ngx.HTTP_OK) then
+        ngx.log(ngx.WARN, "Could not get STS credentials. Response Code=", tostring(code), ", response body=", tostring(body))
+        return nil
+    end
+
+    local stsCreds = response.AssumeRoleResponse.AssumeRoleResult.Credentials
+    stsCreds.ExpireAt = tostring(stsCreds["Expiration"])
+    stsCreds.ExpireAtTimestamp = stsCreds["Expiration"]
+    -- stsCreds.Expiration is already an epoch time
+--    stsCreds.ExpireAtTimestamp = awsDate.convertDateStringToTimestamp(stsCreds.ExpireAt, true)
+
+    -- store it in cache
+    stsCache:put("sts_" .. tostring(self.role_ARN) .. "_" .. tostring(self.role_session_name), cjson.encode(stsCreds))
+    return stsCreds
 end
 
 function _M:getSecurityCredentials()
     --1. try to read it from the local cache
-
+    local stsCreds = stsCache:get("sts_" .. tostring(self.role_ARN) .. "_" .. tostring(self.role_session_name))
+    if (stsCreds ~= nil) then
+        local sts = cjson.decode(stsCreds)
+        -- check to see if the cached credentials are still valid
+        local now_in_secs = ngx.time()
+        local expireAtTimestamp = sts.ExpireAtTimestamp or now_in_secs
+        if (now_in_secs >= expireAtTimestamp) then
+            ngx.log(ngx.WARN, "Current STS token expired " .. tostring(expireAtTimestamp - now_in_secs) .. " seconds ago. Obtaining a new token.")
+        else
+            return sts.AccessKeyId, sts.SecretAccessKey, sts.SessionToken, sts.ExpireAt, sts.ExpireAtTimestamp
+        end
+    end
     --2. get credentials from SecurityTokenService
+    stsCreds = self:getCredentialsFromSTS()
+    if (stsCreds == nil) then
+        return "",""
+    end
+    return stsCreds.AccessKeyId, stsCreds.SecretAccessKey, stsCreds.SessionToken, stsCreds.ExpireAt, stsCreds.ExpireAtTimestamp
 end
 
 return _M

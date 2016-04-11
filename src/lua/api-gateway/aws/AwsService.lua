@@ -36,7 +36,6 @@ local cjson = require"cjson"
 
 local http_client = http:new()
 local http_client_resty = http_resty:new()
-local aws_credentials_provider
 
 local function tableToString(table_ref)
     local s = ""
@@ -115,7 +114,7 @@ function _M:constructor(o)
     local s = tableToString(o)
     ngx.log(ngx.DEBUG, "init object=" .. s)
     self:throwIfInitParamsInvalid(o)
-    aws_credentials_provider = self:getCredentialsProvider(o)
+    self.aws_credentials_provider = self:getCredentialsProvider(o)
 end
 
 function _M:throwIfInitParamsInvalid(o)
@@ -192,13 +191,13 @@ function _M:getAWSHost()
 end
 
 function _M:getCredentials()
-    local key, secret, token, date, timestamp = aws_credentials_provider:getSecurityCredentials()
+    local key, secret, token, date, timestamp = self.aws_credentials_provider:getSecurityCredentials()
     local return_obj = {
         aws_access_key = key,
         aws_secret_key = secret,
         token = token
     }
-    ngx.log(ngx.DEBUG, "getCredentials():", return_obj.aws_access_key, " >> ", return_obj.aws_secret_key, " >> ", return_obj.token)
+    ngx.log(ngx.DEBUG, tostring(self.aws_service) .. " uses credentials from:" .. tostring(self.aws_credentials_provider.provider) .. " ->" .. return_obj.aws_access_key, " >> ", return_obj.aws_secret_key, " >> ", return_obj.token)
     return return_obj
 end
 
@@ -211,7 +210,7 @@ function _M:getAuthorizationHeader(http_method, path, uri_args, body)
         path, -- "/"
         uri_args, -- ngx.req.get_uri_args()
         body)
-    return authorization, awsAuth
+    return authorization, awsAuth, credentials.token
 end
 
 ---
@@ -250,7 +249,6 @@ end
 --
 function _M:performAction(actionName, arguments, path, http_method, useSSL, timeout, contentType, extra_headers)
     local host = self:getAWSHost()
-    local credentials = self:getCredentials()
     local request_method = http_method or "GET"
 
     local arguments = arguments or {}
@@ -280,7 +278,7 @@ function _M:performAction(actionName, arguments, path, http_method, useSSL, time
     end
 
 
-    local authorization, awsAuth = self:getAuthorizationHeader(request_method, request_path, uri_args, request_body)
+    local authorization, awsAuth, authToken = self:getAuthorizationHeader(request_method, request_path, uri_args, request_body)
 
     local t = self.aws_service_name .. "." .. actionName
     local request_headers = {
@@ -289,7 +287,7 @@ function _M:performAction(actionName, arguments, path, http_method, useSSL, time
         ["Accept"] = "application/json",
         ["Content-Type"] = content_type,
         ["X-Amz-Target"] = t,
-        ["x-amz-security-token"] = credentials.token
+        ["x-amz-security-token"] = authToken
     }
     if ( extra_headers ~= nil ) then
         for headerName, headerValue in pairs(extra_headers) do
