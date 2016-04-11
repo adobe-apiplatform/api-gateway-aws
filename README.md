@@ -33,10 +33,10 @@ the [ngx_lua module](http://wiki.nginx.org/HttpLuaModule), [LuaJIT 2.0](http://l
 Requests to AWS Services must supply valid credentials and this library provides a few credentials providers for signing AWS Requests.
 `aws_credentials` config option specifies which provider to use. 
 
-If no `aws_credentials` is provided then the library will try to guess one:
+If no `aws_credentials` is provided then the library will try to find one using the following order:
  
-* if `aws_access_key` and `aws_secret_key` are provided then Basic Credentials Provider is used. 
-* Otherwise the IAM Credentials Provider is used. 
+1. if `aws_access_key` and `aws_secret_key` are provided then Basic Credentials Provider is used. 
+2. Otherwise the IAM Credentials Provider is used. 
    
 >INFO: This library supports the latest AWS V4 signature which means you can use any of the latest AWS APIs without any problem.
 
@@ -51,9 +51,9 @@ aws_credentials = {
     secret_key = "replace-me"
 }
 ```
->INFO: For a better security inside the AWS environment use IAM or STS credentials.
+>INFO: For better security inside the AWS environment use IAM or STS credentials.
 
-### IAM Credentials
+#### IAM Credentials
 This is probably the most popular credentials provider to be used inside the AWS environment. 
 To learn more about IAM Credentials see [IAM Roles for Amazon EC2](http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/iam-roles-for-amazon-ec2.html).
 
@@ -67,7 +67,7 @@ aws_credentials = {
 }
 ```
 
-### STS Credentials
+#### STS Credentials
 AWS Security Token Service(STS) provides a great way to get limited-privilege credentials for accessing AWS Services.
  To learn more about STS Credentials see [Getting Temporary Credentials with STS](http://docs.aws.amazon.com/AWSSdkDocsJava/latest/DeveloperGuide/prog-services-sts.html) and the [STS](#sts) section bellow.
 ```lua
@@ -81,7 +81,7 @@ aws_credentials = {
 Unlike IAM Credentials that exposes a single IAM Role for each EC2 instance, STS Credentials allows an EC2 instance to assume multiple roles each with its own access policy.
 
 This credentials provider uses [SecurityTokenService](src/lua/api-gateway/aws/sts/SecurityTokenService.lua) for making requests to STS and SecurityTokenService uses the IAM Credentials provider for making the call.
- It is strongly recommended to provide the `shared_cache_dict` in order to improve performance. The temporary credentials obtained from STS are stored in it for up to 60 minutes.
+ It is strongly recommended to provide the `shared_cache_dict` in order to improve performance. The temporary credentials obtained from STS are stored in the `shared_cache_dict` for up to 60 minutes.
 
 ### AwsService wrapper
 [AwsService](src/lua/api-gateway/aws/AwsService.lua) is a generic Lua class to interact with any AWS API. The actual implementations extend this class.
