@@ -244,8 +244,8 @@ These are the steps that need to be followed in order to be able to generate tem
 Let's say that the AWS account `A` needs to send records to a Kinesis stream in account `B`.
 
 1. Create a role in account `B` that grants permission to write to Kinesis and update the `Trust Relationship` as follows:
-
 ```json
+{
   "Version": "2012-10-17",
   "Statement": [
     {
@@ -258,11 +258,8 @@ Let's say that the AWS account `A` needs to send records to a Kinesis stream in 
   ]
 }    
 ```
-
 2. The role from account `A` should be allowed to perform `sts:AssumeRole` actions. 
-
-3. Call AWS STS AssumeRole API to obtain temporary credentials.   
-
+3. Call AWS STS AssumeRole API to obtain temporary credentials.
 ```lua 
        local response, code, headers, status, body = sts:assumeRole(role_ARN,
                 role_session_name,
