@@ -36,7 +36,7 @@ local cjson = require"cjson"
 
 local http_client = http:new()
 local http_client_resty = http_resty:new()
-local iam_credentials
+local aws_credentials_provider
 
 local function tableToString(table_ref)
     local s = ""
@@ -47,13 +47,52 @@ local function tableToString(table_ref)
     return s
 end
 
+--- Loads a lua gracefully. If the module doesn't exist the exception is caught, logged and the execution continues
+-- @param module path to the module to be loaded
+--
+local function loadrequire(module)
+    ngx.log(ngx.DEBUG, "Loading module [" .. tostring(module) .. "]")
+    local function requiref(module)
+        require(module)
+    end
+
+    local res = pcall(requiref, module)
+    if not (res) then
+        ngx.log(ngx.WARN, "Could not load module [", module, "].")
+        return nil
+    end
+    return require(module)
+end
+
 ---
 -- @param o object containing info about the AWS Service and Credentials or IAM User to use
--- o.aws_region      - AWS Region
--- o.aws_service     - the AWS Service to call
--- o.aws_secret_key  - AWS Credential
--- o.aws_access_key  - AWS Credential
--- o.aws_iam_user    - optional. if aws_secret_key,aws_access_key pair is missing you can provide an iam_user
+-- o.aws_region                     - required. AWS Region
+-- o.aws_service                    - required. the AWS Service to call
+-- o.aws_credentials                -  An object defining the credentials provider.
+--          i.e. for IAM Credentials
+--            aws_credentials = {
+--                provider = "api-gateway.aws.AWSIAMCredentials",
+--                shared_cache_dict = "my_dict",
+--                security_credentials_host = "169.254.169.254",
+--                security_credentials_port = "80"
+--            }
+--         i.e. for STS Credentials
+--            aws_credentials = {
+--                provider = "api-gateway.aws.AWSSTSCredentials",
+--                role_ARN = "roleA",
+--                role_session_name = "sessionB",
+--                shared_cache_dict = "my_dict",
+--                iam_security_credentials_host = "169.254.169.254",
+--                iam_security_credentials_port = "80"
+--         }
+--        i.e. for Basic Credentials with access_key and secret:
+--            aws_credentials = {
+--                provider = "api-gateway.aws.AWSBasicCredentials",
+--                access_key = ngx.var.aws_access_key,
+--                secret_key = ngx.var.aws_secret_key
+--            }
+-- o.aws_secret_key  - deprecated. Use AWSBasicCredentials instead.
+-- o.aws_access_key  - deprecated. Use AWSBasicCredentials instead.
 -- o.security_credentials_host - optional. the AWS URL to read security credentials from and figure out the iam_user
 -- o.security_credentials_port - optional. the port used when connecting to security_credentials_host
 -- o.shared_cache_dict - optional. AWSIAMCredentials uses it to store IAM Credentials.
@@ -76,20 +115,7 @@ function _M:constructor(o)
     local s = tableToString(o)
     ngx.log(ngx.DEBUG, "init object=" .. s)
     self:throwIfInitParamsInvalid(o)
-
-    local secret = self.aws_secret_key or ""
-    local key = self.aws_access_key or ""
-
-    -- if accessKey or secret is not provided then try with Iam User
-    if (key == "" or secret == "") then
-        ngx.log(ngx.DEBUG, "Initializing IamCredentials as aws_secret_key,aws_access_key were not valid: [", secret, ",", key, "]")
-        iam_credentials = IamCredentials:new({
-            shared_cache_dict = o.shared_cache_dict,
-            iam_user = o.aws_iam_user,
-            security_credentials_host = o.security_credentials_host,
-            security_credentials_port = o.security_credentials_port
-        })
-    end
+    aws_credentials_provider = self:getCredentialsProvider(o)
 end
 
 function _M:throwIfInitParamsInvalid(o)
@@ -109,6 +135,46 @@ function _M:throwIfInitParamsInvalid(o)
     end
 end
 
+--- Returns the credentials provider to be used for authenticating with AWS.
+--    If 'aws_credentials' init object is not set this method will try to guess one provider automatically
+--    If 'aws_secret_key' and 'aws_access_key' is provided then AWSBasicCredentials is used,
+--    else AWSIAMCredentials is used.
+function _M:getCredentialsProvider(init_object)
+    local secret = init_object.aws_secret_key or ""
+    local key = init_object.aws_access_key or ""
+
+    -- init credentials provider
+    if (init_object.aws_credentials == nil) then
+        ngx.log(ngx.DEBUG, "Missing 'aws_credentials' init option; will try to guess one.")
+        -- assume it's the BasicCredentials first
+        init_object.aws_credentials = {
+            provider = "api-gateway.aws.AWSBasicCredentials",
+            access_key = init_object.aws_access_key,
+            secret_key = init_object.aws_secret_key
+        }
+
+        if (key == "" or secret == "") then
+            ngx.log(ngx.DEBUG, "Using AWSIAMCredentials as 'aws_access_key' or 'aws_secret_key' were not provided.")
+            init_object.aws_credentials = {
+                provider = "api-gateway.aws.AWSIAMCredentials",
+                shared_cache_dict = init_object.shared_cache_dict,
+                security_credentials_host = init_object.security_credentials_host,
+                security_credentials_port = init_object.security_credentials_port
+            }
+        end
+    end
+
+    ngx.log(ngx.DEBUG, "Initializing '", tostring(init_object.aws_credentials.provider), "' credentials provider for aws service=", tostring(init_object.aws_service))
+    local credentialsCls = loadrequire(init_object.aws_credentials.provider)
+    if (credentialsCls == nil) then
+        ngx.log(ngx.WARN, "Invalid credentials provider:", tostring(init_object.aws_credentials.provider))
+    end
+    local credentialsProviderInstance = credentialsCls:new(init_object.aws_credentials)
+    ngx.log(ngx.DEBUG, "Initialized security provider '", tostring(init_object.aws_credentials.provider), "' with options:", tableToString(init_object.aws_credentials))
+    return credentialsProviderInstance
+end
+
+
 function _M:debug(...)
     if debug_mode then
         ngx.log(ngx.DEBUG, "AwsService: ", ...)
@@ -125,30 +191,13 @@ function _M:getAWSHost()
     return self.aws_service .. "." .. self.aws_region .. ".amazonaws.com"
 end
 
-function _M:getIamUserCredentials()
-    return iam_credentials:getSecurityCredentials()
-end
-
 function _M:getCredentials()
-    local secret = self.aws_secret_key or ""
-    local key = self.aws_access_key or ""
-    local token, date, timestamp
-
+    local key, secret, token, date, timestamp = aws_credentials_provider:getSecurityCredentials()
     local return_obj = {
+        aws_access_key = key,
         aws_secret_key = secret,
-        aws_access_key = key
+        token = token
     }
-
-    if (key == "" or secret == "") then
-        if (iam_credentials == nil) then
-            ngx.log(ngx.WARN, "Could not discover IAM User. Please provide aws_access_key and aws_secret_key")
-            return return_obj
-        end
-        key, secret, token, date, timestamp = iam_credentials:getSecurityCredentials()
-        return_obj.token = token
-        return_obj.aws_secret_key = secret
-        return_obj.aws_access_key = key
-    end
     ngx.log(ngx.DEBUG, "getCredentials():", return_obj.aws_access_key, " >> ", return_obj.aws_secret_key, " >> ", return_obj.token)
     return return_obj
 end
