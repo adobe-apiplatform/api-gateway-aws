@@ -215,6 +215,64 @@ aws lambda get-policy --function-name hello-world-lambda-fn --region=us-east-1
 
 ```
 
+### STS
+
+The AWS Security Token Service (STS) provides access to temporary, limited-privilege credentials for AWS Identity and IAM users. 
+This can be useful for communicating with a a third party AWS account, without having access to some long-term credentials. (ex. IAM user's access key).
+
+The SecurityTokenService is a AWS STS API wrapper and int provides support for the AssumeRole requests. It can be used as follows:
+
+```lua
+
+       local SecuriyTokenService = require "api-gateway.aws.sts.SecuriyTokenService"
+
+       local service = SecuriyTokenService:new({
+           aws_region = ngx.var.aws_region,
+           aws_secret_key = ngx.var.aws_secret_key,
+           aws_access_key = ngx.var.aws_access_key
+       })
+       
+       local response, code, headers, status, body = sts:assumeRole(role_ARN,
+                role_session_name,
+                policy,
+                security_credentials_timeout,
+                external_id)       
+```
+
+These are the steps that need to be followed in order to be able to generate temporary credentials:
+ 
+Let's say that the AWS account `A` needs to send records to a Kinesis stream in account `B`.
+
+1. Create a role in account `B` that grants permission to write to Kinesis and update the `Trust Relationship` as follows:
+
+```json
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::{A-account-number}:root"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}    
+```
+
+2. The role from account `A` should be allowed to perform `sts:AssumeRole` actions. 
+
+3. Call AWS STS AssumeRole API to obtain temporary credentials.   
+
+```lua 
+       local response, code, headers, status, body = sts:assumeRole(role_ARN,
+                role_session_name,
+                policy,
+                security_credentials_timeout,
+                external_id)       
+```
+
+More documentation on how to configure the accounts [here](http://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-user_externalid.html).
+
 [Back to TOC](#table-of-contents)
 
 Developer guide
