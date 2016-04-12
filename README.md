@@ -29,24 +29,77 @@ the [ngx_lua module](http://wiki.nginx.org/HttpLuaModule), [LuaJIT 2.0](http://l
 [api-gateway-hmac](https://github.com/adobe-apiplatform/api-gateway-hmac) module, and
 [lua-resty-http](https://github.com/pintsized/lua-resty-http) module.
 
-### AWS V4 Signature
-This library supports the latest AWS V4 signature which means you can use any of the latest AWS APIs without any problem.
+### AWS Credentials Provider
+Requests to AWS Services must supply valid credentials and this library provides a few credentials providers for signing AWS Requests.
+`aws_credentials` config option specifies which provider to use. 
+
+If no `aws_credentials` is provided then the library will try to find one using the following order:
+ 
+1. if `aws_access_key` and `aws_secret_key` are provided then Basic Credentials Provider is used. 
+2. Otherwise the IAM Credentials Provider is used. 
+   
+>INFO: This library supports the latest AWS V4 signature which means you can use any of the latest AWS APIs without any problem.
+
+
+
+#### Basic Credentials
+Basic credentials work with `secret_key` and `access_key`.
+```lua
+aws_credentials = {
+    provider = "api-gateway.aws.AWSBasicCredentials",
+    access_key = "replace-me",
+    secret_key = "replace-me"
+}
+```
+>INFO: For better security inside the AWS environment use IAM or STS credentials.
+
+#### IAM Credentials
+This is probably the most popular credentials provider to be used inside the AWS environment. 
+To learn more about IAM Credentials see [IAM Roles for Amazon EC2](http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/iam-roles-for-amazon-ec2.html).
+
+This credentials provider discovers automatically the `IAM Role` associated to the EC2 instance retrieving its credentials and caching them.
+  This is a more secure method for signing AWS requests as credentials are short lived and the NGINX configuration doesn't need to maintain any `access_key` or `secret_key` nor worry about rotating the keys. 
+
+```lua
+aws_credentials = {
+    provider = "api-gateway.aws.AWSIAMCredentials",
+    shared_cache_dict = "my_dict"    -- the name of a shared dictionary used for caching IAM Credentials
+}
+```
+
+#### STS Credentials
+AWS Security Token Service(STS) provides a great way to get limited-privilege credentials for accessing AWS Services.
+ To learn more about STS Credentials see [Getting Temporary Credentials with STS](http://docs.aws.amazon.com/AWSSdkDocsJava/latest/DeveloperGuide/prog-services-sts.html) and the [STS](#sts) section bellow.
+```lua
+aws_credentials = {
+    provider = "api-gateway.aws.AWSSTSCredentials",
+    role_ARN = "arn:aws:iam::111111:role/assumed_role_kinesis", -- ARN of the role to assume
+    role_session_name = "kinesis-session",                      -- a name for this session
+    shared_cache_dict = "shared_cache"                          -- shared dict for caching the credentials
+}    
+```
+Unlike IAM Credentials that exposes a single IAM Role for each EC2 instance, STS Credentials allows an EC2 instance to assume multiple roles each with its own access policy.
+
+This credentials provider uses [SecurityTokenService](src/lua/api-gateway/aws/sts/SecurityTokenService.lua) for making requests to STS and SecurityTokenService uses the IAM Credentials provider for making the call.
+ It is strongly recommended to provide the `shared_cache_dict` in order to improve performance. The temporary credentials obtained from STS are stored in the `shared_cache_dict` for up to 60 minutes.
 
 ### AwsService wrapper
-`AwsService` is a generic Lua class to interact with any AWS API. All the actual implementations extend form this class.
- It's very straight forward to configure it:
-
- ```lua
- local service = AwsService:new({
-         aws_service = "sns",
-         aws_region = "us-east-1",
-         aws_secret_key = "--replace--me",
-         aws_access_key = "--replace--me",
-         aws_debug = true,              -- print warn level messages on the nginx logs. useful for debugging
-         aws_conn_keepalive = 60000,    -- how long to keep the sockets used for AWS open
-         aws_conn_pool = 100            -- the connection pool size for sockets used to connect to AWS
-     })
- ```
+[AwsService](src/lua/api-gateway/aws/AwsService.lua) is a generic Lua class to interact with any AWS API. The actual implementations extend this class.
+ Its configuration is straight forward:
+ 
+```lua
+local service = AwsService:new({
+     aws_service = "sns",
+     aws_region = "us-east-1",
+     aws_credentials = {
+        provider = "api-gateway.aws.AWSIAMCredentials",
+        shared_cache_dict = "my_dict" -- the name of a shared dictionary used for caching IAM Credentials
+     }
+     aws_debug = true,              -- print warn level messages on the nginx logs. useful for debugging
+     aws_conn_keepalive = 60000,    -- how long to keep the sockets used for AWS open
+     aws_conn_pool = 100            -- the connection pool size for sockets used to connect to AWS
+})
+```
 
 
 Synopsis
@@ -214,6 +267,61 @@ aws lambda get-policy --function-name hello-world-lambda-fn --region=us-east-1
        local decryptResult = service:decrypt(encryptResult.CiphertextBlob)
 
 ```
+
+### STS
+
+The AWS Security Token Service (STS) provides access to temporary, limited-privilege credentials for AWS Identity and IAM users. 
+This can be useful for communicating with a a third party AWS account, without having access to some long-term credentials. (ex. IAM user's access key).
+
+The [SecurityTokenService](src/lua/api-gateway/aws/sts/SecurityTokenService.lua) is a AWS STS API wrapper and it provides support for the `AssumeRole` requests. It can be used as follows:
+
+```lua
+
+       local SecuriyTokenService = require "api-gateway.aws.sts.SecuriyTokenService"
+
+       local service = SecuriyTokenService:new({
+           aws_region = ngx.var.aws_region,
+           aws_secret_key = ngx.var.aws_secret_key,
+           aws_access_key = ngx.var.aws_access_key
+       })
+       
+       local response, code, headers, status, body = sts:assumeRole(role_ARN,
+                role_session_name,
+                policy,
+                security_credentials_timeout,
+                external_id)       
+```
+
+These are the steps that need to be followed in order to be able to generate temporary credentials:
+ 
+Let's say that the AWS account `A` needs to send records to a Kinesis stream in account `B`.
+
+* Create a role in account `B` that grants permission to write to Kinesis and update the `Trust Relationship` as follows:
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::{A-account-number}:root"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}    
+```
+* The role from account `A` should be allowed to perform `sts:AssumeRole` actions. 
+* Call AWS STS AssumeRole API to obtain temporary credentials.
+```lua 
+       local response, code, headers, status, body = sts:assumeRole(role_ARN,
+                role_session_name,
+                policy,
+                security_credentials_timeout,
+                external_id)       
+```
+
+>INFO: For more information on how to configure the accounts see [How to Use an External ID When Granting Access to Your AWS Resources to a Third Party](http://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-user_externalid.html).
 
 [Back to TOC](#table-of-contents)
 

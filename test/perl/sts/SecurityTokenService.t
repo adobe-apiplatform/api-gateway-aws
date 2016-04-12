@@ -1,5 +1,7 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
 use lib 'lib';
+use strict;
+use warnings;
 use Test::Nginx::Socket::Lua;
 use Cwd qw(cwd);
 
@@ -94,7 +96,9 @@ __DATA__
 
         location = /sts-mock {
             return 200 '
-            {
+{
+	"AssumeRoleResponse": {
+		"AssumeRoleResult": {
                 "AssumedRoleUser": {
                     "AssumedRoleId": "AROA3XFRBF535PLBIFPI4:s3-access-example",
                     "Arn": "arn:aws:sts::123456789012:assumed-role/xaccounts3access/s3-access-example"
@@ -106,6 +110,8 @@ __DATA__
                     "AccessKeyId": "ASIAJEXAMPLEXEG2JICEA"
                 }
             }
+     }
+}
             ';
         }
 
@@ -130,7 +136,7 @@ __DATA__
                 end
 
                 local response, code, headers, status, body = sts:assumeRole("", "", nil, nil, nil)
-                ngx.say(":" .. tostring(response.Credentials.AccessKeyId))
+                ngx.say(":" .. tostring(response.AssumeRoleResponse.AssumeRoleResult.Credentials.AccessKeyId))
             ';
         }
 --- request
