@@ -89,9 +89,9 @@ __DATA__
                           "Code" : "Success",
                           "LastUpdated" : "2014-11-03T01:56:20Z",
                           "Type" : "AWS-HMAC",
-                          "AccessKeyId" : "$TEST_NGINX_AWS_CLIENT_ID",
-                          "SecretAccessKey" : "$TEST_NGINX_AWS_SECRET",
-                          "Token" : "$TEST_NGINX_AWS_SECURITY_TOKEN",
+                          "AccessKeyId" : "iam_access_key_id",
+                          "SecretAccessKey" : "iam_secret",
+                          "Token" : "iam_security_token",
                           "Expiration" : "$expiration"
                         }';
         }
@@ -205,7 +205,7 @@ __DATA__
 --- request
 GET /test
 --- response_body_like eval
-["iam_access_key=ASIAJPPIB76OM4HRNT6A;sts_access_key=access-key-id;iam_expired_correctly;sts_expired_correctly;"]
+["iam_access_key=iam_access_key_id;sts_access_key=access-key-id;iam_expired_correctly;sts_expired_correctly;"]
 --- error_code: 200
 --- no_error_log
 [error]
