@@ -311,7 +311,18 @@ Let's say that the AWS account `A` needs to send records to a Kinesis stream in 
   ]
 }    
 ```
-* The role from account `A` should be allowed to perform `sts:AssumeRole` actions. 
+* The role from account `A` should be set to allow `sts:AssumeRole` actions pointing to the `B` account:
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Action": "sts:AssumeRole",
+    "Resource": "arn:aws:iam::{B-account-number}:role/*"
+  }]
+}    
+```
+
 * Call AWS STS AssumeRole API to obtain temporary credentials.
 ```lua 
        local response, code, headers, status, body = sts:assumeRole(role_ARN,
