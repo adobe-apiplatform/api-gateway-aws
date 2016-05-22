@@ -21,6 +21,12 @@ function HmacAuthV4Handler:new(o)
         self.aws_region = o.aws_region
         self.aws_secret_key = o.aws_secret_key
         self.aws_access_key = o.aws_access_key
+        ---
+        -- Whether to double url-encode the resource path when constructing the
+        -- canonical request. By default, double url-encoding is true.
+        -- Different sigv4 services seem to be inconsistent on this. So for
+        -- services that want to suppress this, they should set it to false.
+        self.doubleUrlEncode = o.doubleUrlEncode or true
     end
     -- set amazon formatted dates
     local utc = ngx.utctime()
@@ -93,10 +99,14 @@ local function urlEncode(inputString)
             inputString = string.gsub (inputString, "([^%w %-%_%.%~])",
                 function (c) return string.format ("%%%02X", string.byte(c)) end)
             inputString = ngx.re.gsub (inputString, " ", "+", "ijo")
-            -- AWS workarounds
+            -- AWS workarounds following Java SDK
+            -- see https://github.com/aws/aws-sdk-java/blob/master/aws-java-sdk-core/src/main/java/com/amazonaws/util/SdkHttpUtils.java#L80-87
             -- replace '+' ( %2B ) with ( %20 )
             inputString = ngx.re.gsub(inputString, "%2B", "%20", "ijo")
-
+            -- replace %2F with "/"
+            inputString = ngx.re.gsub(inputString, "%2F", "/", "ijo")
+            -- replace %7E with "~"
+            inputString = ngx.re.gsub(inputString, "%7E", "~", "ijo")
         end
         return inputString
         --[[local s = ngx.escape_uri(inputString)
@@ -151,6 +161,10 @@ function HmacAuthV4Handler:getSignature(http_method, request_uri, uri_arg_table,
     headers.host = self.aws_service .. "." .. self.aws_region .. ".amazonaws.com"
     headers["x-amz-date"] = date2
 
+    local encoded_request_uri = request_uri
+    if (self.doubleUrlEncode == true) then
+        encoded_request_uri = urlEncode(request_uri)
+    end
     -- ensure parameters in query string are in order
     local sign = _sign( get_derived_signing_key( self.aws_secret_key,
         date1,
@@ -160,7 +174,7 @@ function HmacAuthV4Handler:getSignature(http_method, request_uri, uri_arg_table,
             date2,
             date1 .. "/" .. self.aws_region .. "/" .. self.aws_service .. "/aws4_request",
             get_hashed_canonical_request(
-                http_method, request_uri,
+                http_method, encoded_request_uri,
                 uri_args,
                 headers, request_payload) ) )
     return sign

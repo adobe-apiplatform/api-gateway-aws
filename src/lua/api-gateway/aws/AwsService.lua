@@ -95,6 +95,8 @@ end
 -- o.security_credentials_host - optional. the AWS URL to read security credentials from and figure out the iam_user
 -- o.security_credentials_port - optional. the port used when connecting to security_credentials_host
 -- o.shared_cache_dict - optional. AWSIAMCredentials uses it to store IAM Credentials.
+-- o.doubleUrlEncode - optional. Whether to double url-encode the resource path
+--                                when constructing the canonical request for AWSV4 signature.
 --
 -- NOTE: class inheirtance inspired from: http://www.lua.org/pil/16.2.html
 function _M:new(o)
@@ -205,7 +207,7 @@ function _M:getAuthorizationHeader(http_method, path, uri_args, body)
     local credentials = self:getCredentials()
     credentials.aws_region = self.aws_region
     credentials.aws_service = self.aws_service
-    local awsAuth = AWSV4S:new(credentials)
+    local awsAuth = AWSV4S:new(credentials, self.doubleUrlEncode)
     local authorization = awsAuth:getAuthorizationHeader(http_method,
         path, -- "/"
         uri_args, -- ngx.req.get_uri_args()
