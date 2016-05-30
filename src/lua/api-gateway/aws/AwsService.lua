@@ -187,7 +187,12 @@ function _M:getHttpClient()
 end
 
 function _M:getAWSHost()
-    return self.aws_service .. "." .. self.aws_region .. ".amazonaws.com"
+    -- FIXME: the endpoint cannot always be determined mechanically; http://docs.aws.amazon.com/general/latest/gr/rande.html
+    if self.aws_service == "s3" then
+        return self.aws_service .. "-" .. self.aws_region  .. ".amazonaws.com"
+    else
+        return self.aws_service .. "." .. self.aws_region .. ".amazonaws.com"
+    end
 end
 
 function _M:getCredentials()
@@ -201,16 +206,18 @@ function _M:getCredentials()
     return return_obj
 end
 
-function _M:getAuthorizationHeader(http_method, path, uri_args, body)
+function _M:getAuthorizationHeader(http_method, path, uri_args, body, host_override)
     local credentials = self:getCredentials()
+    credentials.aws_endpoint = self:getAWSHost()
     credentials.aws_region = self.aws_region
     credentials.aws_service = self.aws_service
     local awsAuth = AWSV4S:new(credentials)
-    local authorization = awsAuth:getAuthorizationHeader(http_method,
+    local authorization, payload_hash = awsAuth:getAuthorizationHeader(http_method,
         path, -- "/"
         uri_args, -- ngx.req.get_uri_args()
-        body)
-    return authorization, awsAuth, credentials.token
+        body,
+        host_override)
+    return authorization, awsAuth, credentials.token, payload_hash
 end
 
 ---
@@ -278,7 +285,7 @@ function _M:performAction(actionName, arguments, path, http_method, useSSL, time
     end
 
 
-    local authorization, awsAuth, authToken = self:getAuthorizationHeader(request_method, request_path, uri_args, request_body)
+    local authorization, awsAuth, authToken, payloadHash = self:getAuthorizationHeader(request_method, request_path, uri_args, request_body)
 
     local t = self.aws_service_name .. "." .. actionName
     local request_headers = {
@@ -287,7 +294,8 @@ function _M:performAction(actionName, arguments, path, http_method, useSSL, time
         ["Accept"] = "application/json",
         ["Content-Type"] = content_type,
         ["X-Amz-Target"] = t,
-        ["x-amz-security-token"] = authToken
+        ["x-amz-security-token"] = authToken,
+        ["x-amz-content-sha256"] = payloadHash
     }
     if ( extra_headers ~= nil ) then
         for headerName, headerValue in pairs(extra_headers) do
