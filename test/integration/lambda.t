@@ -3,6 +3,8 @@
 
 # vim:set ft= ts=4 sw=4 et fdm=marker:
 use lib 'lib';
+use strict;
+use warnings;
 use Test::Nginx::Socket::Lua;
 use Cwd qw(cwd);
 
@@ -130,8 +132,16 @@ __DATA__
                     key1 = "value-1",
                     key2 = "value-2"
                 }
-                local invokeResult, code, headers, status, body  = service:invoke(functionName, payload)
-                ngx.say("EXECUTION RESULT:" .. tostring(body))
+                local context = {}
+                context.identity = {}
+                context.identity.accountId = tostring(ngx.var.oauth_token_user_id)
+                local context_json = cjson.encode(context)
+                local invokeResult, code, headers, status, body  = service:invoke(functionName, payload,context_json)
+                if (code == 200) then
+                    ngx.say("EXECUTION RESULT:" .. tostring(body))
+                else
+                    ngx.say(tostring(body))
+                end
 
                 -- TODO: delete the hello-world function
 

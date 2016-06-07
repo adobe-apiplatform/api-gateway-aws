@@ -1,5 +1,7 @@
 # vim:set ft= ts=4 sw=4 et fdm=marker:
 use lib 'lib';
+use strict;
+use warnings;
 use Test::Nginx::Socket::Lua;
 use Cwd qw(cwd);
 
@@ -143,6 +145,10 @@ __DATA__
         }
 
         location = /latest/meta-data/iam/security-credentials/test-iam-user {
+            set_by_lua $expiration '
+                local offset = os.time() - os.time(os.date("!*t"))
+                return os.date("%Y-%m-%dT%H:%M:%SZ", os.time() + math.abs(offset) + 20)
+            ';
             return 200 '{
                           "Code" : "Success",
                           "LastUpdated" : "2014-11-03T01:56:20Z",
@@ -150,7 +156,7 @@ __DATA__
                           "AccessKeyId" : "$TEST_NGINX_AWS_CLIENT_ID",
                           "SecretAccessKey" : "$TEST_NGINX_AWS_SECRET",
                           "Token" : "$TEST_NGINX_AWS_SECURITY_TOKEN",
-                          "Expiration" : "2014-11-03T08:07:52Z"
+                          "Expiration" : "$expiration"
                         }';
         }
         location /test-with-iam {
@@ -202,6 +208,7 @@ __DATA__
                 end
             ';
         }
+--- timeout: 60
 --- more_headers
 X-Test: test
 --- request
