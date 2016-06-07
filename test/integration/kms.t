@@ -185,9 +185,6 @@ __DATA__
                 local KeyId = list.Aliases[1].AliasName
                 ngx.say("KEY-ALIAS:" .. tostring(KeyId))
 
-                local KeyId = "alias/GW-CACHE-MK"
-                ngx.say("KEY ALIAS:" .. tostring(KeyId))
-
                 -- generate a data key
                 local cipher = service:generateDataKey(KeyId, "AES_256")
                 local blob = cipher.CiphertextBlob
@@ -214,7 +211,7 @@ X-Test: test
 --- request
 GET /test-with-iam
 --- response_body_like eval
-[".*KEY\\sALIAS\\:.*BLOB\\:.*"]
+[".*KEY-ALIAS\\:.*BLOB\\:.*"]
 --- error_code: 200
 --- no_error_log
 [error]
