@@ -15,6 +15,7 @@ Use it to proxy AWS APIs in a simple fashion, with any Http Client that you pref
 dependencies = {
   "lua >= 5.1",
   "lua-api-gateway-hmac",
+  "lua-api-gateway-cachemanager",
   "lua-resty-http"
 }
 build = {
