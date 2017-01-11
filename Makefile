@@ -69,10 +69,16 @@ test:
 	mkdir  -p $(BUILD_DIR)
 	TEST_NGINX_AWS_CLIENT_ID="${TEST_NGINX_AWS_CLIENT_ID}" TEST_NGINX_AWS_SECRET="${TEST_NGINX_AWS_SECRET}" TEST_NGINX_AWS_SECURITY_TOKEN="${TEST_NGINX_AWS_SECURITY_TOKEN}" PATH=/usr/local/sbin:$$PATH TEST_NGINX_SERVROOT=`pwd`/$(BUILD_DIR)/servroot TEST_NGINX_PORT=1989 prove -I ./test/resources/test-nginx/lib -r ./test/perl/
 
-package:
-	git tag -a v1.6 -m 'release-1.6'
-	git push origin v1.6
-	git archive --format=tar --prefix=api-gateway-aws-1.6/ -o api-gateway-aws-1.6.tar.gz -v HEAD
-
 clean: all
 	rm -rf $(BUILD_DIR)/servroot
+
+# This task generates an initial version of a rockspec
+# and it's useful to regenerate the modules list
+rockspec:
+	VERSION=0.0.0 && luarocks write-rockspec --output ./dist/luarocks/lua-api-gateway-aws-$${VERSION}-generated.rockspec \
+	    lua-api-gateway-aws $${VERSION} ./ \
+	    --license="Apache 2.0" \
+	    --summary="AWS SDK for NGINX with Lua" \
+	    --tag=$${VERSION} \
+	    --homepage=https://github.com/adobe-apiplatform/api-gateway-aws \
+	    --lua-version=5.1
