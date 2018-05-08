@@ -1,7 +1,7 @@
 package = "lua-api-gateway-aws"
 version = "1.7.1-1"
 source = {
-   url = "git://github.com/adobe-apiplatform/api-gateway-aws",
+   url = "git://ç",
    tag = "1.7.1"
 }
 description = {
