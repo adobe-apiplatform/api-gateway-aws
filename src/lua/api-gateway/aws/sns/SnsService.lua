@@ -43,7 +43,7 @@ end
 
 -- API: http://docs.aws.amazon.com/sns/latest/APIReference/API_Publish.html
 
-function _M:publish(subject, message, topicArn, targetArn)
+function _M:publish(subject, message, topicArn, targetArn, extra_headers)
     local arguments = {
         Message = message,
         Subject = subject,
@@ -52,7 +52,7 @@ function _M:publish(subject, message, topicArn, targetArn)
     }
 
     local timeout = 60000
-    local ok, code, headers, status, body = self:performAction("Publish", arguments, "/", "POST", true, timeout, "application/x-www-form-urlencoded")
+    local ok, code, headers, status, body = self:performAction("Publish", arguments, "/", "POST", true, timeout, "application/x-www-form-urlencoded",extra_headers)
 
     if (code == ngx.HTTP_OK and body ~= nil) then
         return cjson.decode(body), code, headers, status, body
