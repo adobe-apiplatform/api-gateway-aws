@@ -41,9 +41,44 @@ function _M:listTopics()
     return nil, code, headers, status, body
 end
 
--- API: http://docs.aws.amazon.com/sns/latest/APIReference/API_Publish.html
 
-function _M:publish(subject, message, topicArn, targetArn, extra_headers)
+local function concatenateTables(...)
+    local result = {}
+
+    for i = 1, select("#", ...) do
+        local arg = select(i, ...)
+
+        if type(arg) == "table" then
+            for k, v in pairs(arg) do
+                if (result[k] == nil) then
+                    result[k] = v
+                end
+            end
+        end
+    end
+
+    return result
+end
+
+function _M:formatMessageAttributes(raw_message_attributes)
+    local message_attributes = {}
+
+    if raw_message_attributes ~= nil and type(raw_message_attributes) == "table" then
+        local counter = 1
+        for k, v in pairs(raw_message_attributes) do
+            message_attributes["MessageAttributes.entry." .. counter .. ".Name"] = k
+            message_attributes["MessageAttributes.entry." .. counter .. ".Value.DataType"] = "String"
+            message_attributes["MessageAttributes.entry." .. counter .. ".Value.StringValue"] = v
+            counter = counter + 1
+        end
+    end
+
+    return message_attributes
+
+end
+
+--- API: http://docs.aws.amazon.com/sns/latest/APIReference/API_Publish.html
+function _M:publish(subject, message, topicArn, targetArn, raw_message_attributes)
     local arguments = {
         Message = message,
         Subject = subject,
@@ -51,8 +86,13 @@ function _M:publish(subject, message, topicArn, targetArn, extra_headers)
         TargetArn = targetArn
     }
 
+    local message_attributes = self:formatMessageAttributes(raw_message_attributes)
+    if message_attributes ~= nil then
+        arguments = concatenateTables(arguments, message_attributes)
+    end
+
     local timeout = 60000
-    local ok, code, headers, status, body = self:performAction("Publish", arguments, "/", "POST", true, timeout, "application/x-www-form-urlencoded",extra_headers)
+    local ok, code, headers, status, body = self:performAction("Publish", arguments, "/", "POST", true, timeout, "application/x-www-form-urlencoded")
 
     if (code == ngx.HTTP_OK and body ~= nil) then
         return cjson.decode(body), code, headers, status, body
@@ -61,4 +101,3 @@ function _M:publish(subject, message, topicArn, targetArn, extra_headers)
 end
 
 return _M
-
