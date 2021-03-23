@@ -51,20 +51,13 @@ end
 local _sign = _sign_sha256_FFI
 local _hash = _sha256_hex
 
-local function get_hashed_canonical_request(method, uri, querystring, headers, requestPayload)
+local function get_hashed_canonical_request(method, uri, querystring, host, amzDate, requestPayload)
     local hash = method .. '\n' ..
                  uri .. '\n' ..
                 (querystring or "") .. '\n'
-    -- add canonicalHeaders
-    local canonicalHeaders = ""
-    local signedHeaders = ""
-    for h_n,h_v in pairs(headers) do
-        -- todo: trim and lowercase
-        canonicalHeaders = canonicalHeaders .. h_n .. ":" .. h_v .. "\n"
-        signedHeaders = signedHeaders .. h_n .. ";"
-    end
-    --remove the last ";" from the signedHeaders
-    signedHeaders = string.sub(signedHeaders, 1, -2)
+    -- add canonicalHeaders. Headers must be in alphabetical order
+    local canonicalHeaders = "host:" .. host .. "\n" .. "x-amz-date:" .. amzDate .. "\n"
+    local signedHeaders = "host;x-amz-date"
 
     hash = hash .. canonicalHeaders .. "\n"
             .. signedHeaders .. "\n"
@@ -157,9 +150,7 @@ function HmacAuthV4Handler:getSignature(http_method, request_uri, uri_arg_table,
     local date1 = self.aws_date_short
     local date2 = self.aws_date
 
-    local headers = {}
-    headers.host = self.aws_service .. "." .. self.aws_region .. ".amazonaws.com"
-    headers["x-amz-date"] = date2
+    local host = self.aws_service .. "." .. self.aws_region .. ".amazonaws.com"
 
     local encoded_request_uri = request_uri
     if (self.doubleUrlEncode == true) then
@@ -176,7 +167,7 @@ function HmacAuthV4Handler:getSignature(http_method, request_uri, uri_arg_table,
             get_hashed_canonical_request(
                 http_method, encoded_request_uri,
                 uri_args,
-                headers, request_payload) ) )
+                host, date2, request_payload) ) )
     return sign
 end
 
